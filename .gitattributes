@@ -1,0 +1,2 @@
+hasil_indeks_digital_uji2/hasil_olahdata.xlsx filter=lfs diff=lfs merge=lfs -text
+hasil_indeks_digital_uji2/data_keluarga.csv filter=lfs diff=lfs merge=lfs -text
