@@ -1,0 +1,14 @@
+﻿Dimensi,Variabel,Shapley R2 IID Desa,Proporsi Shapley IID
+Akses perangkat (A),Kepemilikan HP rumah tangga (A1),0.122391,0.12721
+Akses perangkat (A),Kecukupan HP (A2),0.078088,0.081162
+Akses perangkat (A),Kepemilikan perangkat digital produktif (A3),0.075868,0.078855
+Konektivitas internet (B),Akses internet rumah tangga (B1),0.18871,0.196139
+Kapasitas manusia (C),Pendidikan terakhir kepala keluarga (C1),0.142869,0.148493
+Kapasitas manusia (C),Rasio partisipasi sekolah (C2),0.072483,0.075337
+Penggunaan digital (D),Penggunaan media sosial (D1),0.037662,0.039145
+Penggunaan digital (D),Akses media informasi (D2),0.113762,0.11824
+Penggunaan digital (D),Partisipasi informasi/kebijakan (D3),0.043094,0.044791
+Lingkungan pendukung sosial (E),Keterlibatan organisasi kepala keluarga (E1),0.02901,0.030152
+Lingkungan pendukung sosial (E),Keterlibatan organisasi anggota keluarga (E2),0.01487,0.015456
+Lingkungan pendukung sosial (E),Partisipasi kepala keluarga pada kegiatan masyarakat (E3),0.02262,0.023511
+Lingkungan pendukung sosial (E),Partisipasi anggota keluarga pada kegiatan masyarakat (E4),0.020695,0.02151

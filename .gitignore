@@ -1,0 +1,5 @@
+__pycache__/
+*.pyc
+.streamlit_runtime/
+.DS_Store
+Thumbs.db
