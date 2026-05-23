@@ -509,6 +509,32 @@ DISPLAY_TEXT_REPLACEMENTS = (
 )
 
 MISSING_TEXT_VALUES = {"", "nan", "none", "<na>", "null"}
+EDUCATION_YEARS_MAP = {
+    "tidak punya ijazah": 0.0,
+    "tk/paud": 0.0,
+    "tk": 0.0,
+    "paud": 0.0,
+    "sd/sederajat": 6.0,
+    "sd": 6.0,
+    "smp/sederajat": 9.0,
+    "smp": 9.0,
+    "sma/sederajat": 12.0,
+    "sma": 12.0,
+    "smk/sederajat": 12.0,
+    "smk": 12.0,
+    "d1/d2/d3": 14.0,
+    "d1": 13.0,
+    "d2": 14.0,
+    "d3": 15.0,
+    "d4/s1": 16.0,
+    "d4": 16.0,
+    "s1": 16.0,
+    "s2/s3": 19.0,
+    "s2": 18.0,
+    "s3": 21.0,
+}
+FEMALE_HEAD_COLUMN_CANDIDATES = ("jenis_kelamin", "gender", "sex", "jk", "kelamin")
+FEMALE_HEAD_VALUES = {"perempuan", "wanita", "female", "f", "p"}
 NAME_WORD_PATTERN = re.compile(r"[^\W\d_]+", re.UNICODE)
 VILLAGE_DISPLAY_NAME_COLUMNS = {
     "deskel",
@@ -1225,6 +1251,125 @@ def derive_processing_summary(tables: dict[str, pd.DataFrame]) -> pd.DataFrame:
 
     if not rows:
         return pd.DataFrame(columns=["metrik", "nilai"])
+    return pd.DataFrame(rows)
+
+
+def get_processing_summary_value(tables: dict[str, pd.DataFrame], metric_name: str) -> Any:
+    summary_df = tables.get("ringkasan_pengolahan", pd.DataFrame())
+    if summary_df.empty or not {"metrik", "nilai"}.issubset(summary_df.columns):
+        return pd.NA
+    metric_mask = summary_df["metrik"].astype("string").eq(metric_name)
+    if not metric_mask.any():
+        return pd.NA
+    return summary_df.loc[metric_mask, "nilai"].iloc[0]
+
+
+def first_numeric_series(df: pd.DataFrame, columns: tuple[str, ...]) -> pd.Series:
+    for column in columns:
+        if column in df.columns:
+            series = pd.to_numeric(df[column], errors="coerce").dropna()
+            if not series.empty:
+                return series
+    return pd.Series(dtype="float64")
+
+
+def format_mean_sd(series: pd.Series, digits: int = 2) -> str:
+    if series.empty:
+        return "-"
+    mean_value = float(series.mean())
+    std_value = float(series.std()) if len(series) > 1 else 0.0
+    return f"{format_number(mean_value, digits)} ({format_number(std_value, digits)})"
+
+
+def format_min_max(series: pd.Series, digits: int = 0) -> str:
+    if series.empty:
+        return "-"
+    return f"{format_number(float(series.min()), digits)} - {format_number(float(series.max()), digits)}"
+
+
+def estimate_head_schooling_years(detail_df: pd.DataFrame) -> pd.Series:
+    if detail_df.empty or "ijazah" not in detail_df.columns:
+        return pd.Series(dtype="float64")
+    education_series = iid_pipeline.normalize_text_series(detail_df["ijazah"])
+    return pd.to_numeric(education_series.map(EDUCATION_YEARS_MAP), errors="coerce").dropna()
+
+
+def compute_female_head_share(detail_df: pd.DataFrame) -> float | None:
+    if detail_df.empty:
+        return None
+    gender_column = next((column for column in FEMALE_HEAD_COLUMN_CANDIDATES if column in detail_df.columns), None)
+    if gender_column is None:
+        return None
+    gender_series = iid_pipeline.normalize_text_series(detail_df[gender_column])
+    gender_series = gender_series[~gender_series.isin(MISSING_TEXT_VALUES)]
+    if gender_series.empty:
+        return None
+    return float(gender_series.isin(FEMALE_HEAD_VALUES).mean())
+
+
+def build_sample_characteristics_df(tables: dict[str, pd.DataFrame], detail_df: pd.DataFrame) -> pd.DataFrame:
+    desa_df = tables.get("indeks_desa", pd.DataFrame()).copy()
+    household_df = get_household_rows(tables.get("data_keluarga", pd.DataFrame()))
+
+    total_villages: Any = int(len(desa_df)) if not desa_df.empty else pd.NA
+    total_households: Any = int(len(household_df)) if not household_df.empty else pd.NA
+    if pd.isna(total_households):
+        total_households = pd.to_numeric(
+            pd.Series([get_processing_summary_value(tables, "jumlah_rumah_tangga_valid")]),
+            errors="coerce",
+        ).iloc[0]
+
+    household_size_series = first_numeric_series(
+        detail_df,
+        ("jumlah_anggota_rumah_tangga", "jml_keluarga"),
+    )
+    head_age_series = first_numeric_series(detail_df, ("usia",))
+    if head_age_series.empty:
+        head_age_series = first_numeric_series(household_df, ("usia",))
+    schooling_years_series = estimate_head_schooling_years(detail_df)
+    village_population_series = first_numeric_series(desa_df, ("jumlah_kk",))
+    female_head_share = compute_female_head_share(detail_df)
+    if female_head_share is None:
+        female_head_share = compute_female_head_share(household_df)
+
+    rows = [
+        {"Characteristic": "Total villages", "Statistic": "J", "Value": format_number(total_villages, 0)},
+        {"Characteristic": "Total households", "Statistic": "N", "Value": format_number(total_households, 0)},
+        {
+            "Characteristic": "Mean household size",
+            "Statistic": "mean (SD)",
+            "Value": format_mean_sd(household_size_series),
+        },
+        {
+            "Characteristic": "Household head: female-headed share",
+            "Statistic": "%",
+            "Value": format_percent(female_head_share) if female_head_share is not None else "Not available",
+        },
+        {
+            "Characteristic": "Household head: median age",
+            "Statistic": "years",
+            "Value": format_number(float(head_age_series.median()), 1) if not head_age_series.empty else "-",
+        },
+        {
+            "Characteristic": "Household head: median years of schooling",
+            "Statistic": "years",
+            "Value": format_number(float(schooling_years_series.median()), 1)
+            if not schooling_years_series.empty
+            else "-",
+        },
+        {
+            "Characteristic": "Median village population",
+            "Statistic": "households",
+            "Value": format_number(float(village_population_series.median()), 0)
+            if not village_population_series.empty
+            else "-",
+        },
+        {
+            "Characteristic": "Range of village population",
+            "Statistic": "min - max",
+            "Value": format_min_max(village_population_series),
+        },
+    ]
     return pd.DataFrame(rows)
 
 
@@ -4627,6 +4772,15 @@ def render_summary_tab(tables: dict[str, pd.DataFrame], detail_df: pd.DataFrame)
     desa_df = tables.get("indeks_desa", pd.DataFrame())
     warga_df = tables.get("sebaran_warga_iid_rt", pd.DataFrame())
     household_df = get_household_rows(keluarga_df)
+
+    sample_characteristics_df = build_sample_characteristics_df(tables, detail_df)
+    if not sample_characteristics_df.empty:
+        st.markdown("### Table 3. Sample Characteristics")
+        st.dataframe(sample_characteristics_df, width="stretch", hide_index=True)
+        if sample_characteristics_df["Value"].astype("string").str.contains("Not available", na=False).any():
+            st.caption(
+                "Female-headed share is not computed because the current source data does not include a household-head sex/gender field."
+            )
 
     if not household_df.empty:
         chart_cols = st.columns(2)
