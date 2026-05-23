@@ -3199,44 +3199,138 @@ def build_journal_household_boxplot_figure(
     selected_villages: list[str],
 ) -> go.Figure:
     plot_df = add_journal_village_name(household_df)
+    plot_df["iid_rumah_tangga"] = pd.to_numeric(plot_df["iid_rumah_tangga"], errors="coerce")
     plot_df = plot_df.dropna(subset=["iid_rumah_tangga"])
     if selected_villages:
         plot_df = plot_df.loc[plot_df["Village"].isin(selected_villages)].copy()
-    median_order = (
-        plot_df.groupby("Village")["iid_rumah_tangga"]
-        .median()
-        .sort_values(ascending=False)
-        .index.tolist()
+
+    if plot_df.empty:
+        empty_fig = go.Figure()
+        empty_fig.update_layout(
+            title="Household Digital Inclusion Scores by Village",
+            xaxis_title="Village",
+            yaxis_title="Household Digital Inclusion Index",
+        )
+        return apply_publication_figure_style(empty_fig)
+
+    village_stats = (
+        plot_df.groupby("Village", dropna=False)["iid_rumah_tangga"]
+        .agg(mean="mean", median="median", minimum="min", maximum="max")
+        .reset_index()
     )
-    fig = px.box(
-        plot_df,
-        x="Village",
-        y="iid_rumah_tangga",
-        category_orders={"Village": median_order},
-        points="outliers",
-        color_discrete_sequence=["#2563eb"],
+    village_stats["village_group"] = village_stats["mean"].apply(classify_iid_fixed_threshold)
+    village_stats["group_order"] = village_stats["village_group"].map(
+        {category: order for order, category in enumerate(VISIBLE_CATEGORY_ORDER)}
     )
-    fig.update_traces(
-        boxmean=False,
-        boxpoints="outliers",
-        fillcolor="rgba(37, 99, 235, 0.18)",
-        jitter=0.18,
-        line=dict(color="#163249", width=1.8),
-        marker=dict(
-            color="rgba(37, 99, 235, 0.48)",
-            line=dict(color="#163249", width=0.4),
-            outliercolor="#dc2626",
-            size=3.5,
-        ),
-        pointpos=0,
-        whiskerwidth=0.85,
+    village_stats = village_stats.sort_values(
+        ["group_order", "median", "Village"],
+        ascending=[True, False, True],
+        kind="mergesort",
+    )
+    ordered_villages = village_stats["Village"].astype(str).tolist()
+    village_x = {village: index for index, village in enumerate(ordered_villages)}
+    group_lookup = village_stats.set_index("Village")["village_group"].to_dict()
+    fill_colors = {
+        "rendah": "rgba(185, 28, 28, 0.24)",
+        "sedang": "rgba(234, 179, 8, 0.28)",
+        "tinggi": "rgba(20, 184, 166, 0.28)",
+        "sangat tinggi": "rgba(37, 99, 235, 0.24)",
+    }
+
+    fig = go.Figure()
+    for village in ordered_villages:
+        village_values = plot_df.loc[plot_df["Village"].astype(str).eq(village), "iid_rumah_tangga"].dropna()
+        if village_values.empty:
+            continue
+        x_value = village_x[village]
+        village_group = group_lookup.get(village, "sedang")
+        fig.add_trace(
+            go.Box(
+                x=[x_value] * len(village_values),
+                y=village_values,
+                name=village,
+                boxpoints=False,
+                fillcolor=fill_colors.get(village_group, "rgba(37, 99, 235, 0.22)"),
+                hovertemplate=(
+                    f"{village}<br>"
+                    "Q1: %{q1:.3f}<br>"
+                    "Median: %{median:.3f}<br>"
+                    "Q3: %{q3:.3f}<extra></extra>"
+                ),
+                line=dict(color="#111827", width=1.8),
+                marker=dict(color=CATEGORY_COLORS.get(village_group, "#2563eb")),
+                quartilemethod="linear",
+                showlegend=False,
+                whiskerwidth=0.9,
+                width=0.58,
+            )
+        )
+
+        fig.add_trace(
+            go.Scatter(
+                x=[x_value],
+                y=[float(village_values.mean())],
+                mode="markers",
+                marker=dict(color="#00c853", line=dict(color="#059669", width=1), size=10),
+                name="Mean",
+                showlegend=(village == ordered_villages[0]),
+                hovertemplate=f"{village}<br>Mean: %{{y:.3f}}<extra></extra>",
+            )
+        )
+        fig.add_trace(
+            go.Scatter(
+                x=[x_value, x_value],
+                y=[float(village_values.min()), float(village_values.max())],
+                mode="markers",
+                marker=dict(color="#050505", size=7),
+                name="Min/Max",
+                showlegend=(village == ordered_villages[0]),
+                hovertemplate=f"{village}<br>Min/Max: %{{y:.3f}}<extra></extra>",
+            )
+        )
+
+    visible_groups = [
+        category for category in VISIBLE_CATEGORY_ORDER if category in village_stats["village_group"].dropna().tolist()
+    ]
+    for group_index, category in enumerate(visible_groups):
+        group_villages = village_stats.loc[village_stats["village_group"].eq(category), "Village"].astype(str).tolist()
+        if not group_villages:
+            continue
+        x_values = [village_x[village] for village in group_villages]
+        x0, x1 = min(x_values) - 0.5, max(x_values) + 0.5
+        fig.add_vrect(
+            x0=x0,
+            x1=x1,
+            fillcolor="#d1d5db" if group_index % 2 == 0 else "#f8fafc",
+            opacity=0.72,
+            line_width=0,
+            layer="below",
+        )
+        fig.add_annotation(
+            x=(x0 + x1) / 2,
+            y=1.07,
+            xref="x",
+            yref="paper",
+            text=JOURNAL_VILLAGE_GROUP_LABELS.get(category, str(category).title()),
+            showarrow=False,
+            font=dict(size=18, color="#9ca3af"),
+        )
+
+    tick_text = [value if len(value) <= 18 else f"{value[:15]}..." for value in ordered_villages]
+    fig.update_xaxes(
+        tickmode="array",
+        tickvals=list(range(len(ordered_villages))),
+        ticktext=tick_text,
+        range=[-0.5, len(ordered_villages) - 0.5],
     )
     fig.update_layout(
         title="Household Digital Inclusion Scores by Village",
         xaxis_title="Village",
         yaxis_title="Household Digital Inclusion Index",
-        margin=dict(l=20, r=20, t=60, b=80),
-        showlegend=False,
+        height=560,
+        margin=dict(l=20, r=20, t=92, b=92),
+        legend=dict(orientation="h", yanchor="bottom", y=1.15, xanchor="right", x=1),
+        showlegend=True,
     )
     fig.update_xaxes(tickangle=-45, automargin=True)
     fig.update_yaxes(range=[0, 1])
