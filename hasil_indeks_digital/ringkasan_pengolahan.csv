@@ -8,14 +8,12 @@ batas_usia_sekolah_min,7,,,,
 batas_usia_sekolah_max,25,,,,
 cakupan_usia_partisipasi_sekolah,"SD 7-12 tahun, SMP 13-15 tahun, SMA/SMK 16-18 tahun, Perguruan Tinggi 19-25 tahun",,,,
 ,,indikator_hp_dimiliki,modus,1,0
-,,indikator_kecukupan_hp,modus,0.25,0
+,,indikator_kecukupan_hp,modus,1,0
 ,,indikator_perangkat_produktif,modus,0,0
 ,,indikator_akses_internet,modus,0.75,0
 ,,indikator_pendidikan_kepala,modus,0.75,0
-,,indikator_organisasi_kepala,modus,0,0
-,,indikator_organisasi_anggota,modus,0,0
-,,indikator_partisipasi_masyarakat_kepala,modus,0,0
-,,indikator_partisipasi_masyarakat_anggota,modus,0,0
+,,indikator_organisasi_rasio,modus,0,0
+,,indikator_partisipasi_masyarakat_rasio,modus,0,0
 ,,indikator_medsos,modus,1,0
 ,,indikator_media_informasi,modus,1,0
 ,,indikator_partisipasi_kebijakan,modus,0,0

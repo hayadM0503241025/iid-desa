@@ -1,0 +1,6 @@
+﻿kategori_iid_rt,rentang_iid_rt,batas_bawah,batas_atas,jumlah_kk,proporsi_kk,total_kk,metode_kategori
+sangat rendah,<= 0.4875,,0.48749999999999993,19207,0.200719,95691,quintile_empiris_seluruh_kk_valid
+rendah,> 0.4875-0.590278,0.48749999999999993,0.5902777777777779,19070,0.199287,95691,quintile_empiris_seluruh_kk_valid
+sedang,> 0.590278-0.6625,0.5902777777777779,0.6625,19892,0.207877,95691,quintile_empiris_seluruh_kk_valid
+tinggi,> 0.6625-0.739167,0.6625,0.7391666666666667,18404,0.192327,95691,quintile_empiris_seluruh_kk_valid
+sangat tinggi,> 0.739167,0.7391666666666667,,19118,0.199789,95691,quintile_empiris_seluruh_kk_valid

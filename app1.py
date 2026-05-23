@@ -62,13 +62,13 @@ DDP_BLUE = "#111827"
 DDP_RED = "#B91C1C"
 LIGHT_BG = "#EEF2F7"
 
-# Skala Warna High-Contrast Satelit (Red -> Yellow -> Cyan)
-SATELLITE_COLORS = [[0, DDP_RED], [0.5, "yellow"], [1, "cyan"]]
+# Skala warna kontras tinggi yang tetap layak untuk publikasi.
+SATELLITE_COLORS = [[0, "#B91C1C"], [0.5, "#F59E0B"], [1, "#2563EB"]]
 CONTRAST_COLORS = [
-    "#E6194B", "#3CB44B", "#4363D8", "#F58231", "#911EB4",
-    "#46F0F0", "#F032E6", "#BCF60C", "#FABEBE", "#008080",
-    "#E6BEFF", "#9A6324", "#FFFAC8", "#800000", "#AAFFC3",
-    "#808000", "#000075", "#808080"
+    "#1F77B4", "#D62728", "#2CA02C", "#9467BD", "#8C564B",
+    "#E377C2", "#7F7F7F", "#BCBD22", "#17BECF", "#FF7F0E",
+    "#4C78A8", "#F58518", "#54A24B", "#B279A2", "#72B7B2",
+    "#9D755D", "#EECA3B", "#E45756"
 ]
 PLOTLY_DRAW_CONFIG = {
     "scrollZoom": True,
@@ -76,7 +76,7 @@ PLOTLY_DRAW_CONFIG = {
     "displaylogo": False,
     "modeBarButtonsToAdd": ["drawrect", "drawline", "drawopenpath", "drawclosedpath", "drawcircle", "eraseshape"],
 }
-BINARY_COLOR_MAP = {"YA": "#00D4FF", "TIDAK": DDP_RED}
+BINARY_COLOR_MAP = {"YA": "#2563EB", "TIDAK": DDP_RED}
 BANSOS_TARGETING_COLORS = {
     "Rendah - Penerima": "#0f766e",
     "Rendah - Belum Menerima": "#b91c1c",
@@ -90,13 +90,20 @@ BANSOS_TARGETING_COLORS = {
 }
 BPS_CATEGORY_COLORS = {
     "Rendah": "#b91c1c",
-    "Sedang": "#f59e0b",
-    "Tinggi": "#16a34a",
+    "Sedang": "#d97706",
+    "Tinggi": "#0f766e",
     "Sangat Tinggi": "#2563eb",
-    "Tidak Valid": "#94a3b8",
 }
-PLOT_TEXT_COLOR = "#0f172a"
-PLOT_GRID_COLOR = "#cbd5e1"
+BPS_CATEGORY_ORDER = ("Sangat Tinggi", "Tinggi", "Sedang", "Rendah")
+BPS_FALLBACK_COLOR = "#94a3b8"
+PLOT_TEXT_COLOR = "#111827"
+PLOT_GRID_COLOR = "#E2E8F0"
+PUBLICATION_TEMPLATE = "ddp_clarity"
+PUBLICATION_FONT = '"Source Sans Pro", "Segoe UI", Arial, sans-serif'
+PUBLICATION_CONTINUOUS_SCALE = [[0.0, "#B91C1C"], [0.5, "#F59E0B"], [1.0, "#0F766E"]]
+NETWORK_EDGE_NEUTRAL = "rgba(71, 85, 105, 0.24)"
+NETWORK_EDGE_FAINT = "rgba(148, 163, 184, 0.28)"
+NETWORK_NODE_LINE = "#111827"
 HEADER_DATA_URI = get_image_data_uri(HEADER_PATH)
 FRAME_DATA_URI = get_image_data_uri(FRAME_PATH)
 KPI_FRAME_STYLE = (
@@ -137,13 +144,13 @@ def subbab_dropdown(title, expanded=False):
 
 pio.templates["ddp_clarity"] = go.layout.Template(
     layout=go.Layout(
-        paper_bgcolor="rgba(255,255,255,0.0)",
-        plot_bgcolor="rgba(248,250,252,0.85)",
-        font=dict(color=PLOT_TEXT_COLOR, size=14),
-        title=dict(font=dict(color=PLOT_TEXT_COLOR, size=18)),
+        paper_bgcolor="#FFFFFF",
+        plot_bgcolor="#FFFFFF",
+        font=dict(color=PLOT_TEXT_COLOR, size=13, family=PUBLICATION_FONT),
+        title=dict(font=dict(color=PLOT_TEXT_COLOR, size=18, family=PUBLICATION_FONT), x=0.02, xanchor="left"),
         legend=dict(
-            bgcolor="rgba(255,255,255,0.78)",
-            bordercolor="#cbd5e1",
+            bgcolor="rgba(255,255,255,0.92)",
+            bordercolor="#E2E8F0",
             borderwidth=1,
             font=dict(color=PLOT_TEXT_COLOR),
         ),
@@ -169,7 +176,78 @@ pio.templates["ddp_clarity"] = go.layout.Template(
         ),
     )
 )
-pio.templates.default = "ddp_clarity"
+pio.templates.default = PUBLICATION_TEMPLATE
+pio.templates["plotly_white"] = pio.templates[PUBLICATION_TEMPLATE]
+
+
+def style_publication_figure(
+    fig,
+    title=None,
+    height=None,
+    xaxis_title=None,
+    yaxis_title=None,
+    showlegend=None,
+    legend_title=None,
+    margin=None,
+):
+    layout_kwargs = {
+        "template": PUBLICATION_TEMPLATE,
+        "paper_bgcolor": "#FFFFFF",
+        "plot_bgcolor": "#FFFFFF",
+        "font": dict(color=PLOT_TEXT_COLOR, family=PUBLICATION_FONT, size=13),
+        "hoverlabel": dict(bgcolor="#FFFFFF", font_size=12, font_family=PUBLICATION_FONT),
+        "margin": margin or dict(l=48, r=24, t=72, b=48),
+    }
+    if title is not None:
+        layout_kwargs["title"] = dict(text=title, x=0.02, xanchor="left")
+    if height is not None:
+        layout_kwargs["height"] = height
+    if showlegend is not None:
+        layout_kwargs["showlegend"] = showlegend
+    if legend_title is not None:
+        layout_kwargs["legend_title_text"] = legend_title
+    fig.update_layout(**layout_kwargs)
+    fig.update_xaxes(
+        title_text=xaxis_title,
+        showline=True,
+        linewidth=1,
+        linecolor="#CBD5E1",
+        gridcolor=PLOT_GRID_COLOR,
+        zerolinecolor="#CBD5E1",
+        ticks="outside",
+    )
+    fig.update_yaxes(
+        title_text=yaxis_title,
+        showline=True,
+        linewidth=1,
+        linecolor="#CBD5E1",
+        gridcolor=PLOT_GRID_COLOR,
+        zerolinecolor="#CBD5E1",
+        ticks="outside",
+    )
+    return fig
+
+
+def style_network_figure(fig, title, height=540, showlegend=False):
+    style_publication_figure(
+        fig,
+        title=title,
+        height=height,
+        showlegend=showlegend,
+        margin=dict(l=16, r=16, t=72, b=16),
+    )
+    fig.update_xaxes(visible=False, showgrid=False, zeroline=False)
+    fig.update_yaxes(visible=False, showgrid=False, zeroline=False)
+    return fig
+
+
+def ordered_existing_categories(values, preferred_order, invalid_label="Tidak Valid"):
+    observed = pd.Series(values).dropna().astype(str).str.strip()
+    observed = observed[(observed != "") & (observed != invalid_label)]
+    present = set(observed.tolist())
+    ordered = [cat for cat in preferred_order if cat in present]
+    extras = sorted(present.difference(ordered))
+    return ordered + extras
 
 st.markdown(f"""
     <style>
@@ -418,112 +496,131 @@ EDGE_REKAP_COLS = (
     "f_d_dari_rekap_kk",
     "f_e_dari_rekap_kk",
 )
+IKR_DIMENSION_DISPLAY = {
+    "f_a_dari_rekap_kk": "Sandang, Pangan, dan Papan",
+    "f_b_dari_rekap_kk": "Pendidikan",
+    "f_c_dari_rekap_kk": "Sosial, Hukum, dan HAM",
+    "f_d_dari_rekap_kk": "Kesehatan dan Pekerjaan",
+    "f_e_dari_rekap_kk": "Lingkungan dan Infrastruktur",
+}
 IKR_DIMENSION_MAP = (
-    ("F_A (Sandang, Pangan, Papan)", "f_a_dari_rekap_kk"),
-    ("F_B (Pendidikan)", "f_b_dari_rekap_kk"),
-    ("F_C (Sosial, Hukum, HAM)", "f_c_dari_rekap_kk"),
-    ("F_D (Kesehatan & Pekerjaan)", "f_d_dari_rekap_kk"),
-    ("F_E (Lingkungan & Infrastruktur)", "f_e_dari_rekap_kk"),
+    ("Sandang, Pangan, dan Papan", "f_a_dari_rekap_kk"),
+    ("Pendidikan", "f_b_dari_rekap_kk"),
+    ("Sosial, Hukum, dan HAM", "f_c_dari_rekap_kk"),
+    ("Kesehatan dan Pekerjaan", "f_d_dari_rekap_kk"),
+    ("Lingkungan dan Infrastruktur", "f_e_dari_rekap_kk"),
 )
-IKR_OVERALL_METRIC = ("F_IKR Agregat (Keseluruhan)", "f_ikr_dari_rekap_kk")
+IKR_OVERALL_METRIC = ("IKR Agregat (Indeks Kesejahteraan Rakyat)", "f_ikr_dari_rekap_kk")
+IKR_OVERALL_LABEL = "IKR Agregat"
+PSEUDO_DIMENSION_COLS = tuple(IKR_DIMENSION_DISPLAY.values())
+
+
+def format_dimension_source_label(col_name):
+    if col_name == IKR_OVERALL_METRIC[1]:
+        return "Skor IKR agregat"
+    if col_name in IKR_DIMENSION_DISPLAY:
+        return f"Skor dimensi {IKR_DIMENSION_DISPLAY[col_name]}"
+    return str(col_name)
+
+
 DRILLDOWN_DIMENSIONS = {
     "A": {
-        "label": "Dimensi A (Sandang, Pangan, Papan)",
+        "label": "Sandang, Pangan, dan Papan",
         "aggregate_col": "f_a_dari_rekap_kk",
         "variables": [
             {
                 "code": "A1",
-                "label": "A1 - Sandang",
+                "label": "Sandang",
                 "description": "Seberapa sering keluarga membeli pakaian baru (indikator gaya hidup).",
                 "candidates": ["a1_sandang", "a1", "f_a1", "f_a_1", "sandang"],
             },
             {
                 "code": "A2",
-                "label": "A2 - Pangan",
+                "label": "Pangan",
                 "description": "Frekuensi makan dan gizi menu harian (indikator ketahanan pangan mikro).",
                 "candidates": ["a2_pangan", "a2", "f_a2", "f_a_2", "pangan"],
             },
             {
                 "code": "A3",
-                "label": "A3 - Papan",
+                "label": "Papan",
                 "description": "Kualitas lantai, dinding, atap, dan sanitasi rumah (indikator aset fisik).",
                 "candidates": ["a3_papan", "a3", "f_a3", "f_a_3", "papan"],
             },
         ],
     },
     "B": {
-        "label": "Dimensi B (Pendidikan)",
+        "label": "Pendidikan",
         "aggregate_col": "f_b_dari_rekap_kk",
         "variables": [
             {
                 "code": "B1",
-                "label": "B1 - Lama Sekolah",
+                "label": "Lama Sekolah",
                 "description": "Capaian ijazah KK (indikator modal intelektual).",
                 "candidates": ["b1_lama_sekolah", "b1", "f_b1", "f_b_1", "lama_sekolah"],
             },
             {
                 "code": "B2",
-                "label": "B2 - Partisipasi",
+                "label": "Partisipasi Sekolah",
                 "description": "Status sekolah anggota keluarga (indikator keberlanjutan pendidikan).",
                 "candidates": ["b2_partisipasi", "b2", "f_b2", "f_b_2", "partisipasi_sekolah"],
             },
         ],
     },
     "C": {
-        "label": "Dimensi C (Sosial & Hukum)",
+        "label": "Sosial, Hukum, dan HAM",
         "aggregate_col": "f_c_dari_rekap_kk",
         "variables": [
             {
                 "code": "C1",
-                "label": "C1 - Kehidupan Sosial",
+                "label": "Kehidupan Sosial",
                 "description": "Akses bansos dan partisipasi organisasi (indikator inklusi kebijakan).",
                 "candidates": ["c1_kehidupan_sosial", "c1", "f_c1", "f_c_1", "kehidupan_sosial"],
             },
             {
                 "code": "C2",
-                "label": "C2 - Hukum & HAM",
+                "label": "Hukum dan HAM",
                 "description": "Pengalaman kriminalitas dan bantuan hukum (indikator keamanan).",
                 "candidates": ["c2_hukum_ham", "c2", "f_c2", "f_c_2", "hukum_ham"],
             },
         ],
     },
     "D": {
-        "label": "Dimensi D (Kesehatan & Pekerjaan)",
+        "label": "Kesehatan dan Pekerjaan",
         "aggregate_col": "f_d_dari_rekap_kk",
         "variables": [
             {
                 "code": "D1",
-                "label": "D1 - Kesehatan",
+                "label": "Kesehatan",
                 "description": "Riwayat penyakit berat dan disabilitas (indikator kerentanan fisik).",
                 "candidates": ["d1_kesehatan", "d1", "f_d1", "f_d_1", "kesehatan"],
             },
             {
                 "code": "D2",
-                "label": "D2 - Pekerjaan",
+                "label": "Pekerjaan",
                 "description": "Status bekerja dan keterampilan (indikator produktivitas ekonomi).",
                 "candidates": ["d2_pekerjaan", "d2", "f_d2", "f_d_2", "pekerjaan"],
             },
             {
                 "code": "D3",
-                "label": "D3 - Jaminan Sosial",
+                "label": "Jaminan Sosial",
                 "description": "Kepesertaan BPJS/JKN (indikator jaring pengaman).",
                 "candidates": ["d3_jaminan_sosial", "d3", "f_d3", "f_d_3", "jaminan_sosial", "bpjs"],
             },
         ],
     },
     "E": {
-        "label": "Dimensi E (Lingkungan & Infrastruktur)",
+        "label": "Lingkungan dan Infrastruktur",
         "aggregate_col": "f_e_dari_rekap_kk",
         "variables": [
             {
                 "code": "E1",
-                "label": "E1 - Lingkungan",
+                "label": "Lingkungan",
                 "description": "Sumber air bersih dan pengelolaan sampah (indikator sanitasi lingkungan).",
                 "candidates": ["e1_lingkungan", "e1", "f_e1", "f_e_1", "lingkungan"],
             },
             {
                 "code": "E2",
-                "label": "E2 - Infrastruktur",
+                "label": "Infrastruktur",
                 "description": "Akses listrik, ponsel, dan transportasi (indikator konektivitas digital).",
                 "candidates": ["e2_infrastruktur", "e2", "f_e2", "f_e_2", "infrastruktur"],
             },
@@ -556,6 +653,217 @@ def _safe_float_metric(val, default=0.0):
         return fval if np.isfinite(fval) else float(default)
     except Exception:
         return float(default)
+
+
+def rgba_from_hex(color, alpha=0.28):
+    color_text = str(color or "").strip()
+    if color_text.startswith("rgba") or color_text.startswith("rgb"):
+        return color_text
+    if color_text.startswith("#") and len(color_text) in {4, 7}:
+        if len(color_text) == 4:
+            r = int(color_text[1] * 2, 16)
+            g = int(color_text[2] * 2, 16)
+            b = int(color_text[3] * 2, 16)
+        else:
+            r = int(color_text[1:3], 16)
+            g = int(color_text[3:5], 16)
+            b = int(color_text[5:7], 16)
+        return f"rgba({r},{g},{b},{float(alpha):.3f})"
+    return color_text or f"rgba(71,85,105,{float(alpha):.3f})"
+
+
+def normalize_layout_positions(pos_dict, outer_quantile=0.88, clip_radius=1.35):
+    if not pos_dict:
+        return {}
+    keys = list(pos_dict.keys())
+    arr = np.array([pos_dict[k] for k in keys], dtype=float)
+    if arr.ndim != 2 or arr.shape[1] != 2:
+        return {k: np.array([0.0, 0.0]) for k in keys}
+    center = np.nanmedian(arr, axis=0)
+    arr = np.nan_to_num(arr - center, nan=0.0, posinf=0.0, neginf=0.0)
+    radii = np.sqrt((arr ** 2).sum(axis=1))
+    valid_radii = radii[np.isfinite(radii) & (radii > 1e-9)]
+    scale_ref = float(np.quantile(valid_radii, outer_quantile)) if len(valid_radii) else 1.0
+    scale_ref = max(scale_ref, 1e-9)
+    arr = arr / scale_ref
+    radii = np.sqrt((arr ** 2).sum(axis=1))
+    too_far = radii > clip_radius
+    if np.any(too_far):
+        arr[too_far] = arr[too_far] / radii[too_far, None] * clip_radius
+    return {k: arr[idx] for idx, k in enumerate(keys)}
+
+
+def build_clustered_network_layout(graph_obj, partition=None, layout_spread=2.0, seed=42):
+    if graph_obj is None or graph_obj.number_of_nodes() == 0:
+        return {}
+    nodes = list(graph_obj.nodes())
+    if partition is None:
+        partition = {n: graph_obj.nodes[n].get("cluster", 0) for n in nodes}
+    cluster_nodes = {}
+    for n in nodes:
+        try:
+            cid = int(partition.get(n, graph_obj.nodes[n].get("cluster", 0)))
+        except (TypeError, ValueError):
+            cid = 0
+        cluster_nodes.setdefault(cid, []).append(n)
+
+    cluster_ids = sorted(cluster_nodes)
+    max_cluster_size = max(len(v) for v in cluster_nodes.values())
+    spread = float(np.clip(layout_spread, 1.0, 3.4))
+
+    cluster_graph = nx.Graph()
+    for cid, c_nodes in cluster_nodes.items():
+        cluster_graph.add_node(cid, size=len(c_nodes))
+    for u, v, d in graph_obj.edges(data=True):
+        cu = int(partition.get(u, graph_obj.nodes[u].get("cluster", 0)))
+        cv = int(partition.get(v, graph_obj.nodes[v].get("cluster", 0)))
+        if cu == cv:
+            continue
+        weight = _safe_float_metric(d.get("weight"), default=0.0)
+        if cluster_graph.has_edge(cu, cv):
+            cluster_graph[cu][cv]["weight"] += weight
+        else:
+            cluster_graph.add_edge(cu, cv, weight=weight)
+
+    if len(cluster_ids) == 1:
+        cluster_centers = {cluster_ids[0]: np.array([0.0, 0.0])}
+    elif len(cluster_ids) == 2:
+        cluster_centers = {
+            cluster_ids[0]: np.array([-1.0, 0.0]),
+            cluster_ids[1]: np.array([1.0, 0.0]),
+        }
+    else:
+        cluster_centers = nx.circular_layout(cluster_graph, scale=1.0)
+
+    pos_final = {}
+    center_radius = 2.45 + (1.05 * spread)
+    for idx, cid in enumerate(cluster_ids):
+        c_nodes = cluster_nodes[cid]
+        sub_g = graph_obj.subgraph(c_nodes).copy()
+        if len(c_nodes) == 1:
+            local_pos = {c_nodes[0]: np.array([0.0, 0.0])}
+        elif len(c_nodes) <= 12:
+            local_pos = nx.circular_layout(sub_g, scale=1.0)
+        else:
+            local_k = float(np.clip(5.0 / np.sqrt(len(c_nodes)), 0.38, 1.15))
+            local_pos = nx.spring_layout(
+                sub_g,
+                seed=int(seed) + idx + 13,
+                weight="weight",
+                k=local_k,
+                iterations=360,
+                scale=1.0,
+            )
+        local_pos = normalize_layout_positions(local_pos, outer_quantile=0.86, clip_radius=1.42)
+        size_ratio = np.sqrt(len(c_nodes) / max(max_cluster_size, 1))
+        local_radius = (0.75 + (1.35 * size_ratio)) * (0.92 + (0.08 * spread))
+        center = np.array(cluster_centers[cid], dtype=float) * center_radius
+        for n in c_nodes:
+            pos_final[n] = center + (np.array(local_pos.get(n, [0.0, 0.0]), dtype=float) * local_radius)
+
+    return pos_final
+
+
+def select_representative_edges(graph_obj, max_edges=900, per_node=1):
+    if graph_obj is None or graph_obj.number_of_edges() == 0:
+        return []
+    all_edges = [
+        (u, v, d, _safe_float_metric(d.get("weight"), default=0.0))
+        for u, v, d in graph_obj.edges(data=True)
+    ]
+    limit = int(max(0, min(max_edges, len(all_edges))))
+    if len(all_edges) <= limit:
+        return [(u, v, d) for u, v, d, _ in sorted(all_edges, key=lambda x: x[3], reverse=True)]
+
+    edge_lookup = {frozenset((u, v)): (u, v, d, w) for u, v, d, w in all_edges}
+    selected_keys = set()
+    if per_node > 0:
+        for n in graph_obj.nodes():
+            incident = [
+                (frozenset((u, v)), w)
+                for u, v, _, w in all_edges
+                if u == n or v == n
+            ]
+            incident = sorted(incident, key=lambda x: x[1], reverse=True)[:per_node]
+            for key, _ in incident:
+                selected_keys.add(key)
+
+    strongest = sorted(all_edges, key=lambda x: x[3], reverse=True)
+    for u, v, _, _ in strongest:
+        if len(selected_keys) >= limit:
+            break
+        selected_keys.add(frozenset((u, v)))
+
+    selected = [edge_lookup[key] for key in selected_keys if key in edge_lookup]
+    selected = sorted(selected, key=lambda x: x[3], reverse=True)[:limit]
+    return [(u, v, d) for u, v, d, _ in selected]
+
+
+def network_marker_size(n_nodes, base=8.0):
+    n_nodes = int(max(n_nodes, 1))
+    if n_nodes >= 700:
+        return max(5.2, base - 3.0)
+    if n_nodes >= 450:
+        return max(5.8, base - 2.2)
+    if n_nodes >= 250:
+        return max(6.5, base - 1.3)
+    return base
+
+
+def centrality_marker_sizes(values, n_nodes):
+    val_arr = np.asarray(values, dtype=float)
+    if val_arr.size == 0:
+        return []
+    valid = val_arr[np.isfinite(val_arr)]
+    if valid.size == 0:
+        return [7.0 for _ in val_arr]
+    lo = float(np.quantile(valid, 0.05))
+    hi = float(np.quantile(valid, 0.95))
+    if hi <= lo:
+        lo = float(np.nanmin(valid))
+        hi = float(np.nanmax(valid))
+    denom = max(hi - lo, 1e-9)
+    norm = np.clip((val_arr - lo) / denom, 0.0, 1.0)
+    min_size = network_marker_size(n_nodes, base=7.2)
+    max_size = min_size + (8.5 if n_nodes >= 350 else 12.0)
+    return (min_size + ((max_size - min_size) * np.sqrt(norm))).tolist()
+
+
+def add_network_edge_traces(
+    fig,
+    edge_items,
+    pos,
+    edge_min,
+    edge_span,
+    color_fn=None,
+    base_width=0.32,
+    width_scale=0.95,
+    hover=False,
+):
+    for u, v, d in edge_items:
+        if u not in pos or v not in pos:
+            continue
+        w = _safe_float_metric(d.get("weight"), default=0.0)
+        w_norm = float(np.clip((w - edge_min) / max(edge_span, 1e-9), 0.0, 1.0))
+        if color_fn:
+            try:
+                edge_color = color_fn(u, v, d, w_norm)
+            except TypeError:
+                edge_color = color_fn(u, v)
+        else:
+            edge_color = NETWORK_EDGE_NEUTRAL
+        edge_width = base_width + (width_scale * w_norm)
+        fig.add_trace(
+            go.Scatter(
+                x=[pos[u][0], pos[v][0], None],
+                y=[pos[u][1], pos[v][1], None],
+                mode="lines",
+                line=dict(width=edge_width, color=edge_color),
+                hovertemplate=f"Interaksi: {w:.4f}<extra></extra>" if hover else None,
+                hoverinfo="text" if hover else "none",
+                showlegend=False,
+            )
+        )
 
 
 def resolve_basis_column(df_in, preferred_col):
@@ -669,6 +977,312 @@ def compute_auto_threshold_from_distribution(sim_values, threshold_grid=None):
         for i in range(len(threshold_grid))
     ]
     return float(threshold_grid[best_idx]), table
+
+
+def compute_threshold_sensitivity_analysis(
+    node_ids,
+    candidate_edges,
+    threshold_grid=None,
+    lcc_only=True,
+    force_louvain_lcc=False,
+):
+    if threshold_grid is None:
+        threshold_grid = [round(x, 1) for x in np.arange(0.1, 1.0, 0.1)]
+    nodes = list(node_ids or [])
+    pair_total = int(len(candidate_edges or []))
+    rows = []
+
+    for threshold in threshold_grid:
+        threshold_float = float(threshold)
+        graph_raw = nx.Graph()
+        graph_raw.add_nodes_from(nodes)
+        for u, v, sim_weight in candidate_edges:
+            if float(sim_weight) >= threshold_float:
+                graph_raw.add_edge(u, v, weight=float(sim_weight))
+
+        if graph_raw.number_of_nodes() > 0:
+            lcc_nodes = max(nx.connected_components(graph_raw), key=len)
+            graph_lcc = graph_raw.subgraph(lcc_nodes).copy()
+        else:
+            graph_lcc = nx.Graph()
+
+        graph_target = graph_lcc if lcc_only else graph_raw
+        partition_graph = graph_lcc if force_louvain_lcc else graph_target
+        modularity_q = 0.0
+        cluster_count = 0
+
+        if partition_graph.number_of_nodes() > 0:
+            if partition_graph.number_of_edges() > 0:
+                try:
+                    partition_tmp = community_louvain.best_partition(partition_graph, weight="weight", random_state=42)
+                    cluster_count = int(len(set(partition_tmp.values())))
+                    modularity_q = _safe_float_metric(
+                        community_louvain.modularity(partition_tmp, partition_graph, weight="weight"),
+                        default=0.0,
+                    )
+                except Exception:
+                    cluster_count = int(nx.number_connected_components(partition_graph))
+                    modularity_q = 0.0
+            else:
+                cluster_count = int(partition_graph.number_of_nodes())
+
+        edge_count = int(graph_raw.number_of_edges())
+        rows.append(
+            {
+                "threshold": threshold_float,
+                "edge_count": edge_count,
+                "edge_ratio_pct": float((edge_count / pair_total) * 100.0) if pair_total else 0.0,
+                "density_raw": float(nx.density(graph_raw)) if graph_raw.number_of_nodes() > 1 else 0.0,
+                "komponen_raw": int(nx.number_connected_components(graph_raw)) if graph_raw.number_of_nodes() else 0,
+                "node_lcc": int(graph_lcc.number_of_nodes()),
+                "edge_lcc": int(graph_lcc.number_of_edges()),
+                "density_analisis": float(nx.density(graph_target)) if graph_target.number_of_nodes() > 1 else 0.0,
+                "jumlah_cluster": int(cluster_count),
+                "modularity": float(modularity_q),
+            }
+        )
+
+    return rows
+
+
+def merge_threshold_distribution_with_sensitivity(distribution_rows, sensitivity_rows):
+    distribution_lookup = {
+        round(float(row.get("threshold", 0.0)), 6): dict(row)
+        for row in (distribution_rows or [])
+    }
+    merged_rows = []
+    for sensitivity_row in sensitivity_rows or []:
+        key = round(float(sensitivity_row.get("threshold", 0.0)), 6)
+        merged_row = dict(sensitivity_row)
+        for col, val in distribution_lookup.get(key, {}).items():
+            if col not in merged_row:
+                merged_row[col] = val
+        merged_rows.append(merged_row)
+    return merged_rows
+
+
+def get_threshold_sensitivity_dataframe(meta):
+    rows = meta.get("threshold_sensitivity") or meta.get("threshold_distribution") or []
+    df_sens = pd.DataFrame(rows)
+    if df_sens.empty or "threshold" not in df_sens.columns:
+        return pd.DataFrame()
+    df_sens = df_sens.copy()
+    df_sens["threshold"] = pd.to_numeric(df_sens["threshold"], errors="coerce")
+    df_sens = df_sens.dropna(subset=["threshold"]).sort_values("threshold").reset_index(drop=True)
+    threshold_selected = round(float(meta.get("threshold_selected", 0.0)), 6)
+    df_sens["threshold_terpilih"] = df_sens["threshold"].round(6).eq(threshold_selected)
+    return df_sens
+
+
+def render_threshold_sensitivity_heatmap(df_sens):
+    heatmap_cols = [
+        ("edge_count", "Edge"),
+        ("density_analisis", "Density"),
+        ("modularity", "Modularity Q"),
+        ("jumlah_cluster", "Jumlah Klaster"),
+        ("komponen_raw", "Komponen Raw"),
+    ]
+    available_cols = [(col, label) for col, label in heatmap_cols if col in df_sens.columns]
+    if not available_cols:
+        return
+
+    heat_display = pd.DataFrame(
+        {
+            label: pd.to_numeric(df_sens[col], errors="coerce").fillna(0.0).to_numpy()
+            for col, label in available_cols
+        },
+        index=df_sens["threshold"].map(lambda x: f"{float(x):.1f}"),
+    ).T
+
+    heat_norm = heat_display.copy()
+    for idx in heat_norm.index:
+        row = pd.to_numeric(heat_norm.loc[idx], errors="coerce").fillna(0.0)
+        span = float(row.max() - row.min())
+        heat_norm.loc[idx] = 0.5 if span <= 1e-12 else (row - row.min()) / span
+
+    text_values = heat_display.copy()
+    for idx in text_values.index:
+        if idx in {"Edge", "Jumlah Klaster", "Komponen Raw"}:
+            text_values.loc[idx] = text_values.loc[idx].map(lambda x: f"{float(x):.0f}")
+        else:
+            text_values.loc[idx] = text_values.loc[idx].map(lambda x: f"{float(x):.4f}")
+
+    fig_heat = go.Figure(
+        data=go.Heatmap(
+            z=heat_norm.astype(float).values,
+            x=list(heat_norm.columns),
+            y=list(heat_norm.index),
+            text=text_values.values,
+            texttemplate="%{text}",
+            colorscale="RdYlGn",
+            colorbar=dict(title="Skala relatif"),
+            hovertemplate="Threshold %{x}<br>%{y}: %{text}<extra></extra>",
+        )
+    )
+    fig_heat.update_layout(
+        title="Heatmap Sensitivitas Seluruh Kandidat Threshold",
+        xaxis_title="Threshold",
+        yaxis_title="Metrik",
+        template="plotly_white",
+        height=max(330, 70 * len(heat_norm.index)),
+    )
+    st.plotly_chart(fig_heat, use_container_width=True, config=PLOTLY_DRAW_CONFIG)
+
+
+def render_auto_threshold_summary(
+    meta,
+    graph_obj,
+    partition,
+    selected_desa=None,
+    basis_col=None,
+    method_label="-",
+    kernel_info="-",
+    rounding_label="-",
+    compact=False,
+):
+    threshold_used = float(meta.get("threshold_selected", 0.0))
+    df_sens = get_threshold_sensitivity_dataframe(meta)
+    if df_sens.empty:
+        st.info("Data kandidat threshold belum tersedia untuk dirangkum.")
+        return
+
+    selected_rows = df_sens[df_sens["threshold_terpilih"]]
+    selected_row = selected_rows.iloc[0].to_dict() if not selected_rows.empty else {}
+    total_pair = int(len(meta.get("pairwise_similarity_values", [])))
+    total_edge_kumulatif = int(df_sens["edge_count"].sum()) if "edge_count" in df_sens.columns else 0
+    jumlah_kandidat = int(len(df_sens))
+    rata2_edge_umum = float(total_edge_kumulatif / max(jumlah_kandidat, 1))
+    jarak_terpilih = float(selected_row.get("jarak_ke_rata2_edge", abs(float(selected_row.get("edge_count", 0.0)) - rata2_edge_umum)))
+    density_default = float(nx.density(graph_obj)) if graph_obj.number_of_nodes() > 1 else 0.0
+    modularity_default = 0.0
+    if graph_obj.number_of_edges() > 0 and partition:
+        try:
+            modularity_default = _safe_float_metric(community_louvain.modularity(partition, graph_obj, weight="weight"), default=0.0)
+        except Exception:
+            modularity_default = 0.0
+    cluster_default = int(len(set(partition.values()))) if partition else 0
+
+    if not compact:
+        st.markdown(
+            f"<div class='premium-hero'><b>Rangkuman Sensitivity Analysis Threshold Otomatis</b><br>"
+            f"Desa: <b>{selected_desa or '-'}</b> | Basis: <b>{basis_col or '-'}</b> | "
+            f"Metode: <b>{method_label}</b> ({kernel_info}) | One-Hot Rounding: <b>{rounding_label}</b><br>"
+            f"Threshold otomatis dipilih dari {jumlah_kandidat} kandidat dengan membandingkan jumlah edge yang terbentuk "
+            f"pada tiap nilai ambang.</div>",
+            unsafe_allow_html=True,
+        )
+
+    c1, c2, c3, c4, c5 = st.columns(5)
+    c1.metric("Threshold Terpilih", f"{threshold_used:.2f}")
+    c2.metric("Edge Terpilih", f"{int(selected_row.get('edge_count', graph_obj.number_of_edges())):,}")
+    c3.metric("Density Analisis", f"{float(selected_row.get('density_analisis', density_default)):.4f}")
+    c4.metric("Modularity Q", f"{float(selected_row.get('modularity', modularity_default)):.4f}")
+    c5.metric("Jumlah Klaster", f"{int(selected_row.get('jumlah_cluster', cluster_default))}")
+
+    st.markdown(
+        f"<div class='soft-card'><b>Justifikasi threshold otomatis.</b><br>"
+        f"Ambang <b>{threshold_used:.2f}</b> dipilih karena jumlah edge pada kandidat ini paling dekat dengan "
+        f"rata-rata edge kumulatif seluruh kandidat ({rata2_edge_umum:.2f}). "
+        f"Jarak kandidat terpilih terhadap rata-rata tersebut adalah <b>{jarak_terpilih:.2f} edge</b>. "
+        f"Tabel dan heatmap di bawah memperlihatkan bagaimana density, modularity, dan jumlah klaster berubah "
+        f"di semua kandidat, sehingga hasil graf tidak hanya bergantung pada satu angka yang tampak subjektif.</div>",
+        unsafe_allow_html=True,
+    )
+
+    chart_cols = st.columns([1.0, 1.0])
+    with chart_cols[0]:
+        fig_edges = px.line(
+            df_sens,
+            x="threshold",
+            y="edge_count",
+            markers=True,
+            title="Threshold vs Jumlah Edge",
+            labels={"threshold": "Threshold", "edge_count": "Jumlah Edge"},
+        )
+        fig_edges.add_hline(
+            y=rata2_edge_umum,
+            line_dash="dash",
+            line_color=DDP_RED,
+            annotation_text=f"Rata-rata edge = {rata2_edge_umum:.2f}",
+        )
+        fig_edges.add_vline(
+            x=threshold_used,
+            line_dash="dash",
+            line_color="#111827",
+            annotation_text=f"Terpilih {threshold_used:.2f}",
+        )
+        fig_edges.update_layout(template="plotly_white")
+        st.plotly_chart(fig_edges, use_container_width=True, config=PLOTLY_DRAW_CONFIG)
+    with chart_cols[1]:
+        trend_cols = [
+            ("density_analisis", "Density"),
+            ("modularity", "Modularity Q"),
+            ("jumlah_cluster", "Jumlah Klaster"),
+        ]
+        trend_df = df_sens[["threshold"] + [col for col, _ in trend_cols if col in df_sens.columns]].copy()
+        trend_long_rows = []
+        for col, label in trend_cols:
+            if col not in trend_df.columns:
+                continue
+            vals = pd.to_numeric(trend_df[col], errors="coerce").fillna(0.0)
+            span = float(vals.max() - vals.min())
+            norm_vals = pd.Series(0.5, index=vals.index) if span <= 1e-12 else (vals - vals.min()) / span
+            for idx, val in norm_vals.items():
+                trend_long_rows.append({"threshold": float(trend_df.loc[idx, "threshold"]), "Metrik": label, "Nilai Relatif": float(val)})
+        trend_long = pd.DataFrame(trend_long_rows)
+        if not trend_long.empty:
+            fig_trend = px.line(
+                trend_long,
+                x="threshold",
+                y="Nilai Relatif",
+                color="Metrik",
+                markers=True,
+                title="Tren Relatif Density, Modularity, dan Klaster",
+            )
+            fig_trend.add_vline(x=threshold_used, line_dash="dash", line_color="#111827")
+            fig_trend.update_layout(template="plotly_white", yaxis_title="Nilai relatif 0-1")
+            st.plotly_chart(fig_trend, use_container_width=True, config=PLOTLY_DRAW_CONFIG)
+
+    render_threshold_sensitivity_heatmap(df_sens)
+
+    table_cols = [
+        ("threshold", "Threshold"),
+        ("edge_count", "Jumlah Edge Raw"),
+        ("edge_ratio_pct", "Rasio Edge (%)"),
+        ("density_raw", "Density Raw"),
+        ("komponen_raw", "Komponen Raw"),
+        ("node_lcc", "Node LCC"),
+        ("edge_lcc", "Edge LCC"),
+        ("density_analisis", "Density Analisis"),
+        ("modularity", "Modularity Q"),
+        ("jumlah_cluster", "Jumlah Klaster"),
+        ("jarak_ke_rata2_edge", "Jarak ke Rata-rata Edge"),
+        ("threshold_terpilih", "Terpilih"),
+    ]
+    display_cols = [col for col, _ in table_cols if col in df_sens.columns]
+    df_display = df_sens[display_cols].copy()
+    rename_map = {col: label for col, label in table_cols if col in df_display.columns}
+    df_display = df_display.rename(columns=rename_map)
+    if "Terpilih" in df_display.columns:
+        df_display["Terpilih"] = df_display["Terpilih"].map(lambda x: "Ya" if bool(x) else "")
+
+    def _highlight_selected_threshold(row):
+        if str(row.get("Terpilih", "")).lower() == "ya":
+            return ["background-color: #DCFCE7; color: #14532D; font-weight: 700;"] * len(row)
+        return [""] * len(row)
+
+    format_cols = {
+        "Threshold": "{:.2f}",
+        "Rasio Edge (%)": "{:.2f}",
+        "Density Raw": "{:.4f}",
+        "Density Analisis": "{:.4f}",
+        "Modularity Q": "{:.4f}",
+        "Jarak ke Rata-rata Edge": "{:.2f}",
+    }
+    st.dataframe(
+        df_display.style.format({k: v for k, v in format_cols.items() if k in df_display.columns}).apply(_highlight_selected_threshold, axis=1),
+        use_container_width=True,
+    )
 
 
 def safe_numeric_assortativity(graph_obj, attr_name, default=0.0):
@@ -827,6 +1441,584 @@ def compute_centrality_on_similarity_graph(graph_obj, metric_key):
     return {}
 
 
+CENTRALITY_ROLE_COLORS = {
+    "Penghubung informasi potensial": "#2563EB",
+    "Jembatan antar-kelompok": "#7C3AED",
+    "Prioritas verifikasi berbasis data": "#F59E0B",
+    "Rentan dan relatif terisolasi": "#DC2626",
+    "Node umum": "#94A3B8",
+}
+
+CENTRALITY_ROLE_ORDER = [
+    "Prioritas verifikasi berbasis data",
+    "Rentan dan relatif terisolasi",
+    "Jembatan antar-kelompok",
+    "Penghubung informasi potensial",
+    "Node umum",
+]
+
+
+def make_anonymized_node_mapping(node_ids):
+    stable_ids = sorted({str(n) for n in (node_ids or [])})
+    return {node_id: f"N-{idx + 1:03d}" for idx, node_id in enumerate(stable_ids)}
+
+
+def apply_privacy_view(df, id_col="family_id", name_col="Nama", publish_mode=True):
+    if df is None:
+        return pd.DataFrame()
+    result = df.copy()
+    if "Kode Node" not in result.columns:
+        if id_col in result.columns:
+            anon_map = make_anonymized_node_mapping(result[id_col].dropna().astype(str).tolist())
+            result["Kode Node"] = result[id_col].astype(str).map(anon_map).fillna("N-000")
+        else:
+            result["Kode Node"] = [f"N-{idx + 1:03d}" for idx in range(len(result))]
+
+    if "Dusun/Kode Dusun" not in result.columns and "Dusun" in result.columns:
+        if publish_mode:
+            dusun_vals = sorted(result["Dusun"].fillna("Tidak tersedia").astype(str).unique().tolist())
+            dusun_map = {val: f"Dusun-{idx + 1}" for idx, val in enumerate(dusun_vals)}
+            result["Dusun/Kode Dusun"] = result["Dusun"].fillna("Tidak tersedia").astype(str).map(dusun_map)
+        else:
+            result["Dusun/Kode Dusun"] = result["Dusun"].fillna("Tidak tersedia").astype(str)
+
+    if publish_mode:
+        drop_cols = [col for col in [id_col, name_col, "Dusun"] if col in result.columns]
+        if drop_cols:
+            result = result.drop(columns=drop_cols)
+    return result
+
+
+def safe_hover_text(row, publish_mode=True):
+    def pick(*cols, default="-"):
+        for col in cols:
+            if col in row and pd.notnull(row.get(col)):
+                value = row.get(col)
+                if str(value).strip() != "":
+                    return value
+        return default
+
+    parts = []
+    if publish_mode:
+        parts.append(f"Kode Node: {pick('Kode Node')}")
+    else:
+        parts.append(f"Nama: {pick('Nama')}")
+        parts.append(f"family_id: {pick('family_id')}")
+        parts.append(f"Kode Node: {pick('Kode Node')}")
+    parts.extend(
+        [
+            f"Klaster Louvain: {pick('Klaster Louvain')}",
+            f"Dusun/Kode Dusun: {pick('Dusun/Kode Dusun', 'Dusun')}",
+            f"IKR Agregat: {_safe_float_metric(pick('IKR Agregat', default=np.nan), default=np.nan):.3f}",
+            f"Status BPS: {pick('Status BPS')}",
+            f"Status Bansos: {pick('Status Bansos')}",
+            f"Akses Informasi: {pick('Akses Informasi')}",
+            f"Peran Struktural: {pick('Peran Struktural')}",
+        ]
+    )
+    for col in ["Degree Centrality", "Betweenness Centrality", "Closeness Centrality", "Eigenvector Centrality"]:
+        if col in row:
+            parts.append(f"{col}: {_safe_float_metric(row.get(col), default=0.0):.6f}")
+    parts.append("Catatan: indikasi awal, perlu pendalaman lapangan, bukan bukti tunggal.")
+    return "<br>".join(parts)
+
+
+def centrality_level_from_quantile(value, q25, q75):
+    val = _safe_float_metric(value, default=np.nan)
+    if not np.isfinite(val):
+        return "Tidak tersedia"
+    q25_val = _safe_float_metric(q25, default=val)
+    q75_val = _safe_float_metric(q75, default=val)
+    if abs(q75_val - q25_val) <= 1e-12:
+        return "Sedang"
+    if val >= q75_val:
+        return "Tinggi"
+    if val <= q25_val:
+        return "Rendah"
+    return "Sedang"
+
+
+def ikr_level_from_value(ikr_value, status_bps=None):
+    status_text = str(status_bps or "").strip().lower()
+    ikr = _safe_float_metric(ikr_value, default=np.nan)
+    if status_text == "rendah" or (np.isfinite(ikr) and ikr < 60):
+        return "Rendah"
+    if status_text == "sedang" or (np.isfinite(ikr) and 60 <= ikr < 70):
+        return "Sedang"
+    if status_text in {"tinggi", "sangat tinggi"} or (np.isfinite(ikr) and ikr >= 70):
+        return "Tinggi"
+    return "Tidak tersedia"
+
+
+def access_info_label(row):
+    internet_available = "internet_num" in row and pd.notnull(row.get("internet_num"))
+    ponsel_available = "ponsel_num" in row and pd.notnull(row.get("ponsel_num"))
+    internet_val = _safe_float_metric(row.get("internet_num"), default=0.0)
+    ponsel_val = _safe_float_metric(row.get("ponsel_num"), default=0.0)
+    if not internet_available and not ponsel_available:
+        return "Tidak tersedia"
+    if internet_val >= 1 or ponsel_val >= 1:
+        return "Tersedia"
+    return "Tidak tersedia pada data"
+
+
+def centrality_role_implication(role):
+    mapping = {
+        "Penghubung informasi potensial": "Dapat dipertimbangkan sebagai kanal penyebaran informasi program desa, dengan persetujuan dan konteks sosial yang tepat.",
+        "Jembatan antar-kelompok": "Berpotensi membantu menjangkau beberapa klaster, tetapi perlu dipahami bersama struktur sosial lokal.",
+        "Prioritas verifikasi berbasis data": "Masuk daftar awal untuk verifikasi atau pendampingan; bukan bukti tunggal ketepatan sasaran.",
+        "Rentan dan relatif terisolasi": "Perlu pendekatan langsung karena posisinya tidak menonjol dalam jaringan informasi.",
+        "Node umum": "Tetap dibaca sebagai bagian struktur jaringan, tanpa implikasi prioritas khusus dari centrality.",
+    }
+    return mapping.get(role, mapping["Node umum"])
+
+
+def centrality_role_ethics_note(role=None):
+    if role == "Prioritas verifikasi berbasis data":
+        return "Indikasi awal untuk pendalaman lapangan; tidak boleh dimaknai sebagai bukti tunggal ketepatan sasaran."
+    return "Gunakan sebagai alat bantu evaluasi; hindari label sosial dan tetap perlukan consent/verifikasi."
+
+
+def classify_centrality_policy_role(row, centrality_col, betweenness_col=None):
+    centrality_val = _safe_float_metric(row.get(centrality_col), default=0.0)
+    centrality_q75 = _safe_float_metric(row.get("_centrality_q75"), default=centrality_val)
+    centrality_q25 = _safe_float_metric(row.get("_centrality_q25"), default=centrality_val)
+    bet_col = betweenness_col or "Betweenness Centrality"
+    bet_val = _safe_float_metric(row.get(bet_col), default=0.0)
+    bet_q75 = _safe_float_metric(row.get("_betweenness_q75"), default=bet_val)
+    ikr_level = str(row.get("Level IKR", "")).strip()
+    access_available = str(row.get("Akses Informasi", "")).strip().lower() == "tersedia"
+    status_bansos = str(row.get("Status Bansos", "")).strip().lower()
+
+    centrality_has_spread = abs(centrality_q75 - centrality_q25) > 1e-12
+    centrality_high = centrality_has_spread and centrality_val >= centrality_q75
+    centrality_low = centrality_has_spread and centrality_val <= centrality_q25
+    betweenness_high = bet_q75 > 0 and bet_val >= bet_q75
+    ikr_low_or_mid = ikr_level in {"Rendah", "Sedang"}
+    ikr_low = ikr_level == "Rendah"
+    not_receiving_support = status_bansos in {"tidak menerima", "belum menerima", "tidak"}
+
+    if centrality_high and ikr_low_or_mid and not_receiving_support:
+        return "Prioritas verifikasi berbasis data"
+    if centrality_low and ikr_low:
+        return "Rentan dan relatif terisolasi"
+    if betweenness_high:
+        return "Jembatan antar-kelompok"
+    if centrality_high and access_available:
+        return "Penghubung informasi potensial"
+    if centrality_high and ikr_low_or_mid:
+        return "Prioritas verifikasi berbasis data"
+    return "Node umum"
+
+
+def build_centrality_policy_narrative(df_role, centrality_name):
+    if df_role is None or df_role.empty:
+        return "Analisis centrality belum memiliki node yang cukup untuk ditafsirkan."
+    role_counts = df_role["Peran Struktural"].value_counts()
+    strategic_mask = df_role["Peran Struktural"].ne("Node umum")
+    n_strategic = int(strategic_mask.sum())
+    n_info = int(role_counts.get("Penghubung informasi potensial", 0))
+    n_verify = int(role_counts.get("Prioritas verifikasi berbasis data", 0))
+    n_isolated = int(role_counts.get("Rentan dan relatif terisolasi", 0))
+    return (
+        f"Analisis {centrality_name} menunjukkan terdapat {n_strategic} node dengan posisi struktural yang perlu dibaca lebih lanjut. "
+        f"Sebanyak {n_info} node memiliki akses informasi yang tersedia sehingga berpotensi menjadi penghubung program desa. "
+        f"Sebanyak {n_verify} node masuk kategori prioritas verifikasi berbasis data, dan {n_isolated} node menunjukkan kondisi kesejahteraan relatif rendah dengan posisi jaringan yang relatif tidak menonjol. "
+        "Hasil ini digunakan sebagai alat bantu evaluasi dan bukan sebagai dasar tunggal penetapan status sosial atau kelayakan bantuan."
+    )
+
+
+def unique_existing_columns(df, columns):
+    return [col for col in dict.fromkeys(columns) if col in df.columns]
+
+
+def prepare_centrality_policy_dataframe(graph_obj, partition, selected_centrality_key, dusun_attr, publish_mode=True):
+    centrality_name = {
+        "degree": "Degree Centrality",
+        "betweenness": "Betweenness Centrality",
+        "closeness": "Closeness Centrality",
+        "eigenvector": "Eigenvector Centrality",
+    }.get(selected_centrality_key, "Degree Centrality")
+    all_centrality_specs = [
+        ("Degree Centrality", "degree"),
+        ("Betweenness Centrality", "betweenness"),
+        ("Closeness Centrality", "closeness"),
+        ("Eigenvector Centrality", "eigenvector"),
+    ]
+    centrality_metric_values = {
+        metric_label: compute_centrality_on_similarity_graph(graph_obj, metric_key)
+        for metric_label, metric_key in all_centrality_specs
+    }
+    node_ids_local = list(graph_obj.nodes())
+    anon_node_map = make_anonymized_node_mapping(node_ids_local)
+    dusun_values = sorted(
+        {
+            str(graph_obj.nodes[n].get(dusun_attr, "Tidak tersedia"))
+            for n in node_ids_local
+        }
+    )
+    dusun_code_map = {val: f"Dusun-{idx + 1}" for idx, val in enumerate(dusun_values)}
+    rows = []
+    for n in node_ids_local:
+        n_attr = graph_obj.nodes[n]
+        profesi_raw = n_attr.get(
+            "profesi pekerjaan",
+            n_attr.get("profesi_pekerjaan", n_attr.get("pekerjaan", n_attr.get("profesi", "Tidak diketahui"))),
+        )
+        bansos_status = "Penerima" if int(_safe_float_metric(n_attr.get("bansos_num"), default=0.0) > 0) == 1 else "Tidak Menerima"
+        row = {
+            "family_id": n,
+            "Nama": n_attr.get("nama", "-"),
+            "Kode Node": anon_node_map.get(str(n), "N-000"),
+            "Klaster Louvain": int(partition.get(n, -1)),
+            "Dusun": n_attr.get(dusun_attr, "-"),
+            "Dusun/Kode Dusun": (
+                dusun_code_map.get(str(n_attr.get(dusun_attr, "Tidak tersedia")), "Dusun-0")
+                if publish_mode
+                else str(n_attr.get(dusun_attr, "-"))
+            ),
+            "Profesi/Pekerjaan": str(profesi_raw).strip() if pd.notnull(profesi_raw) else "Tidak diketahui",
+            "Status Bansos": bansos_status,
+            "IKR Agregat": _safe_float_metric(n_attr.get("f_ikr_dari_rekap_kk"), default=np.nan),
+            "internet_num": n_attr.get("internet_num", n_attr.get("digital_num", np.nan)),
+            "ponsel_num": n_attr.get("ponsel_num", np.nan),
+        }
+        for metric_label, _ in all_centrality_specs:
+            row[metric_label] = float(centrality_metric_values.get(metric_label, {}).get(n, 0.0))
+        row["Status BPS"] = n_attr.get("kategori_ikr", categorize_ikr_bps(row["IKR Agregat"])[0])
+        for dim_label, dim_col in IKR_DIMENSION_MAP:
+            row[dim_label] = _safe_float_metric(n_attr.get(dim_col), default=np.nan)
+        rows.append(row)
+
+    df_role = pd.DataFrame(rows)
+    if df_role.empty:
+        return df_role, centrality_name, all_centrality_specs
+
+    c_series = pd.to_numeric(df_role[centrality_name], errors="coerce").fillna(0.0)
+    b_series = pd.to_numeric(df_role["Betweenness Centrality"], errors="coerce").fillna(0.0)
+    c_q25 = float(c_series.quantile(0.25)) if not c_series.empty else 0.0
+    c_q75 = float(c_series.quantile(0.75)) if not c_series.empty else 0.0
+    b_q75 = float(b_series.quantile(0.75)) if not b_series.empty else 0.0
+    df_role["_centrality_q25"] = c_q25
+    df_role["_centrality_q75"] = c_q75
+    df_role["_betweenness_q75"] = b_q75
+    df_role["Level Centrality"] = df_role[centrality_name].map(lambda v: centrality_level_from_quantile(v, c_q25, c_q75))
+    df_role["Level IKR"] = df_role.apply(lambda r: ikr_level_from_value(r.get("IKR Agregat"), r.get("Status BPS")), axis=1)
+    df_role["Akses Informasi"] = df_role.apply(access_info_label, axis=1)
+    df_role["Peran Struktural"] = df_role.apply(
+        lambda r: classify_centrality_policy_role(r, centrality_col=centrality_name, betweenness_col="Betweenness Centrality"),
+        axis=1,
+    )
+    df_role["Implikasi Program"] = df_role["Peran Struktural"].map(centrality_role_implication)
+    df_role["Catatan Etika"] = df_role["Peran Struktural"].map(centrality_role_ethics_note)
+    df_role["Centrality terpilih"] = df_role[centrality_name]
+    df_role["Hover Aman"] = df_role.apply(lambda r: safe_hover_text(r, publish_mode=publish_mode), axis=1)
+    return df_role.sort_values(centrality_name, ascending=False).reset_index(drop=True), centrality_name, all_centrality_specs
+
+
+def render_centrality_analysis_page(
+    graph_obj,
+    partition,
+    df_v,
+    selected_desa,
+    selected_centrality_key,
+    col_spasial,
+    layout_spread=2.2,
+):
+    st.markdown(f"<h1 class='main-header'>Analisis Centrality: {selected_desa}</h1>", unsafe_allow_html=True)
+    publish_mode = st.toggle("Mode publikasi / anonimisasi", value=True, key=f"centrality_page_publish_{selected_centrality_key}")
+    highlight_roles = st.toggle("Highlight Peran Struktural", value=True, key=f"centrality_page_highlight_{selected_centrality_key}")
+    dusun_attr = "dusun" if "dusun" in df_v.columns else col_spasial
+    df_role, centrality_name, all_centrality_specs = prepare_centrality_policy_dataframe(
+        graph_obj,
+        partition,
+        selected_centrality_key,
+        dusun_attr,
+        publish_mode=publish_mode,
+    )
+    if df_role.empty:
+        st.info("Nilai centrality belum bisa dihitung untuk graf saat ini.")
+        return
+
+    cluster_opts = sorted(df_role["Klaster Louvain"].dropna().unique().tolist())
+    dusun_filter_col = "Dusun/Kode Dusun" if publish_mode else "Dusun"
+    dusun_opts = sorted(df_role[dusun_filter_col].fillna("Tidak tersedia").astype(str).unique().tolist())
+    f1, f2 = st.columns(2)
+    with f1:
+        selected_clusters = st.multiselect("Pilih Klaster", options=cluster_opts, default=cluster_opts, key=f"cent_page_cluster_{selected_centrality_key}")
+    with f2:
+        selected_dusun = st.multiselect("Pilih Dusun/Kode Dusun", options=dusun_opts, default=dusun_opts, key=f"cent_page_dusun_{selected_centrality_key}")
+    df_view = df_role[
+        df_role["Klaster Louvain"].isin(selected_clusters)
+        & df_role[dusun_filter_col].astype(str).isin([str(x) for x in selected_dusun])
+    ].copy()
+    if df_view.empty:
+        st.warning("Filter klaster/dusun tidak memiliki node. Silakan ubah filter.")
+        return
+
+    selected_node_set = set(df_view["family_id"].tolist())
+    graph_view = graph_obj.subgraph(selected_node_set).copy()
+    df_view, centrality_name, all_centrality_specs = prepare_centrality_policy_dataframe(
+        graph_view,
+        {n: partition.get(n, -1) for n in graph_view.nodes()},
+        selected_centrality_key,
+        dusun_attr,
+        publish_mode=publish_mode,
+    )
+    df_view = df_view.sort_values(centrality_name, ascending=False).reset_index(drop=True)
+    node_ids_view = list(graph_view.nodes())
+    pos = build_clustered_network_layout(graph_view, partition=partition, layout_spread=layout_spread, seed=42)
+    edge_weights = [_safe_float_metric(d.get("weight"), default=0.0) for _, _, d in graph_view.edges(data=True)]
+    edge_min = float(min(edge_weights)) if edge_weights else 0.0
+    edge_max = float(max(edge_weights)) if edge_weights else 1.0
+    edge_span = max(edge_max - edge_min, 1e-9)
+    visible_edges = select_representative_edges(graph_view, max_edges=int(np.clip(graph_view.number_of_nodes() * 1.25, 120, 650)), per_node=1)
+
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Node Terpilih", f"{len(df_view):,}")
+    c2.metric("Edge Terpilih", f"{graph_view.number_of_edges():,}")
+    c3.metric("Nilai Tertinggi", f"{float(df_view[centrality_name].max()):.6f}")
+    c4.metric("Node Strategis", f"{int(df_view['Peran Struktural'].ne('Node umum').sum()):,}")
+
+    st.markdown(f"#### Visual Jaringan Centrality ({centrality_name})")
+    fig_cent = go.Figure()
+    add_network_edge_traces(
+        fig_cent,
+        visible_edges,
+        pos,
+        edge_min,
+        edge_span,
+        color_fn=lambda *_args, **_kwargs: "rgba(148, 163, 184, 0.24)",
+        base_width=0.26,
+        width_scale=0.72,
+        hover=False,
+    )
+    lookup = df_view.set_index("family_id")
+    node_order = [n for n in node_ids_view if n in lookup.index and n in pos]
+    node_vals = np.array([float(lookup.loc[n, centrality_name]) for n in node_order], dtype=float)
+    size_vals = centrality_marker_sizes(node_vals, len(node_order))
+    if highlight_roles:
+        for role in [r for r in CENTRALITY_ROLE_ORDER if r in set(df_view["Peran Struktural"].astype(str))]:
+            role_nodes = [n for n in node_order if str(lookup.loc[n, "Peran Struktural"]) == role]
+            if not role_nodes:
+                continue
+            fig_cent.add_trace(
+                go.Scatter(
+                    x=[pos[n][0] for n in role_nodes],
+                    y=[pos[n][1] for n in role_nodes],
+                    mode="markers",
+                    marker=dict(
+                        size=[size_vals[node_order.index(n)] for n in role_nodes],
+                        color=CENTRALITY_ROLE_COLORS.get(role, "#94A3B8"),
+                        opacity=0.32 if role == "Node umum" else 0.9,
+                        line=dict(color=NETWORK_NODE_LINE, width=0.7),
+                    ),
+                    text=[safe_hover_text(lookup.loc[n], publish_mode=publish_mode) for n in role_nodes],
+                    hoverinfo="text",
+                    name=role,
+                )
+            )
+    else:
+        cmin = float(np.nanmin(node_vals)) if len(node_vals) else 0.0
+        cmax = float(np.nanmax(node_vals)) if len(node_vals) else 1.0
+        fig_cent.add_trace(
+            go.Scatter(
+                x=[pos[n][0] for n in node_order],
+                y=[pos[n][1] for n in node_order],
+                mode="markers",
+                marker=dict(
+                    size=size_vals,
+                    color=node_vals.tolist(),
+                    colorscale="Viridis",
+                    showscale=True,
+                    cmin=cmin,
+                    cmax=cmax if cmax > cmin else cmin + 1e-6,
+                    colorbar=dict(title=centrality_name),
+                    opacity=0.84,
+                    line=dict(color=NETWORK_NODE_LINE, width=0.5),
+                ),
+                text=[safe_hover_text(lookup.loc[n], publish_mode=publish_mode) for n in node_order],
+                hoverinfo="text",
+                showlegend=False,
+            )
+        )
+    top5_nodes = df_view.head(5)["family_id"].tolist()
+    top5_nodes = [n for n in top5_nodes if n in pos]
+    if top5_nodes:
+        size_lookup = {n: size_vals[idx] for idx, n in enumerate(node_order)}
+        fig_cent.add_trace(
+            go.Scatter(
+                x=[pos[n][0] for n in top5_nodes],
+                y=[pos[n][1] for n in top5_nodes],
+                mode="markers",
+                marker=dict(size=[size_lookup.get(n, 12.0) + 5.0 for n in top5_nodes], color="rgba(255,255,255,0)", line=dict(color="#111827", width=1.8)),
+                hoverinfo="skip",
+                name="Top 5 centrality",
+                showlegend=True,
+            )
+        )
+    style_network_figure(fig_cent, title=f"Jaringan Louvain Menurut {centrality_name}", height=690, showlegend=highlight_roles)
+    st.plotly_chart(fig_cent, use_container_width=True, config=PLOTLY_DRAW_CONFIG)
+
+    st.markdown("#### Hubungan Centrality dengan Kesejahteraan Rumah Tangga")
+    scatter_cols = unique_existing_columns(
+        df_view,
+        [
+            "Kode Node",
+            "IKR Agregat",
+            "Status Bansos",
+            "Peran Struktural",
+            "Hover Aman",
+            centrality_name,
+            "Degree Centrality",
+            "Betweenness Centrality",
+        ],
+    )
+    scatter_df = df_view[scatter_cols].copy().dropna(subset=[centrality_name, "IKR Agregat"])
+    if not scatter_df.empty:
+        size_source = "Betweenness Centrality" if "Betweenness Centrality" in scatter_df.columns else "Degree Centrality"
+        if float(pd.to_numeric(scatter_df[size_source], errors="coerce").fillna(0.0).max()) <= 0 and "Degree Centrality" in scatter_df.columns:
+            size_source = "Degree Centrality"
+        scatter_df["Ukuran Visual"] = pd.to_numeric(scatter_df[size_source], errors="coerce").fillna(0.0)
+        scatter_df["Ukuran Visual"] = scatter_df["Ukuran Visual"] + max(float(scatter_df["Ukuran Visual"].max()) * 0.05, 1e-6)
+        fig_scatter = px.scatter(
+            scatter_df,
+            x=centrality_name,
+            y="IKR Agregat",
+            color="Status Bansos",
+            size="Ukuran Visual",
+            symbol="Peran Struktural",
+            hover_name="Kode Node",
+            custom_data=["Hover Aman"],
+            title="Hubungan Centrality dengan Kesejahteraan Rumah Tangga",
+            color_discrete_map={"Penerima": "#2563EB", "Tidak Menerima": "#B91C1C"},
+            category_orders={"Peran Struktural": CENTRALITY_ROLE_ORDER},
+        )
+        fig_scatter.update_traces(hovertemplate="%{customdata[0]}<extra></extra>", marker=dict(line=dict(color="#111827", width=0.45)))
+        median_centrality = float(pd.to_numeric(scatter_df[centrality_name], errors="coerce").median())
+        fig_scatter.add_vline(x=median_centrality, line_dash="dash", line_color="#111827", annotation_text="Median centrality")
+        fig_scatter.add_hline(y=60.0, line_dash="dash", line_color="#B91C1C", annotation_text="Ambang IKR 60")
+        fig_scatter.add_annotation(x=0.77, y=0.20, xref="paper", yref="paper", text="Prioritas verifikasi", showarrow=False, font=dict(size=12, color="#92400E"))
+        fig_scatter.add_annotation(x=0.77, y=0.83, xref="paper", yref="paper", text="Penghubung informasi", showarrow=False, font=dict(size=12, color="#1D4ED8"))
+        fig_scatter.add_annotation(x=0.20, y=0.20, xref="paper", yref="paper", text="Rentan terisolasi", showarrow=False, font=dict(size=12, color="#B91C1C"))
+        fig_scatter.add_annotation(x=0.24, y=0.83, xref="paper", yref="paper", text="Relatif stabil, tidak dominan jaringan", showarrow=False, font=dict(size=12, color="#475569"))
+        style_publication_figure(fig_scatter, title="Hubungan Centrality dengan Kesejahteraan Rumah Tangga", height=560, xaxis_title=centrality_name, yaxis_title="IKR Agregat")
+        st.plotly_chart(fig_scatter, use_container_width=True, config=PLOTLY_DRAW_CONFIG)
+
+    st.markdown("#### Matriks Posisi Struktural dan Kondisi Kesejahteraan")
+    matrix_df = df_view.dropna(subset=[centrality_name, "IKR Agregat"]).copy()
+    if not matrix_df.empty:
+        matrix_df["Kelompok IKR"] = np.where(matrix_df["Level IKR"].isin(["Rendah", "Sedang"]), "IKR rendah/sedang", "IKR tinggi/sangat tinggi")
+        matrix_df["Kelompok Centrality"] = np.where(matrix_df["Level Centrality"].eq("Tinggi"), "Centrality tinggi", "Centrality rendah/sedang")
+        y_order = ["IKR rendah/sedang", "IKR tinggi/sangat tinggi"]
+        x_order = ["Centrality rendah/sedang", "Centrality tinggi"]
+        meanings = {
+            ("IKR rendah/sedang", "Centrality tinggi"): "Strategis untuk verifikasi/pendampingan",
+            ("IKR rendah/sedang", "Centrality rendah/sedang"): "Rentan dan perlu pendekatan langsung",
+            ("IKR tinggi/sangat tinggi", "Centrality tinggi"): "Penghubung informasi potensial",
+            ("IKR tinggi/sangat tinggi", "Centrality rendah/sedang"): "Relatif stabil, bukan prioritas jaringan",
+        }
+        total_n = max(len(matrix_df), 1)
+        z_vals, text_vals = [], []
+        for y_label in y_order:
+            z_row, text_row = [], []
+            for x_label in x_order:
+                count_val = int(((matrix_df["Kelompok IKR"] == y_label) & (matrix_df["Kelompok Centrality"] == x_label)).sum())
+                pct_val = (count_val / total_n) * 100.0
+                z_row.append(count_val)
+                text_row.append(f"{count_val} node<br>{pct_val:.1f}%<br>{meanings[(y_label, x_label)]}")
+            z_vals.append(z_row)
+            text_vals.append(text_row)
+        fig_matrix = go.Figure(go.Heatmap(z=z_vals, x=x_order, y=y_order, text=text_vals, texttemplate="%{text}", colorscale="YlGnBu", colorbar=dict(title="Jumlah node")))
+        style_publication_figure(fig_matrix, title="Matriks Posisi Struktural dan Kondisi Kesejahteraan", height=420, xaxis_title="Centrality", yaxis_title="Kondisi kesejahteraan")
+        st.plotly_chart(fig_matrix, use_container_width=True, config=PLOTLY_DRAW_CONFIG)
+
+    st.markdown("#### Profil Node Strategis dan Implikasi Program")
+    top_n = st.slider("Jumlah node pada tabel profil", min_value=5, max_value=30, value=15, step=5, key=f"centrality_page_profile_topn_{selected_centrality_key}")
+    role_rank = {role: idx for idx, role in enumerate(CENTRALITY_ROLE_ORDER)}
+    df_profile = df_view.copy()
+    df_profile["_role_rank"] = df_profile["Peran Struktural"].map(role_rank).fillna(len(role_rank))
+    df_profile = df_profile.sort_values(["_role_rank", centrality_name], ascending=[True, False]).head(top_n).copy()
+    profile_cols = unique_existing_columns(
+        df_profile,
+        [
+            "Kode Node",
+            "Klaster Louvain",
+            "Dusun/Kode Dusun",
+            "Centrality terpilih",
+            "Degree Centrality",
+            "Betweenness Centrality",
+            "Closeness Centrality",
+            "Eigenvector Centrality",
+            "IKR Agregat",
+            "Status BPS",
+            "Status Bansos",
+            "Akses Informasi",
+            "Peran Struktural",
+            "Implikasi Program",
+            "Catatan Etika",
+        ],
+    )
+    st.dataframe(
+        df_profile[profile_cols].style.format(
+            {
+                "Centrality terpilih": "{:.6f}",
+                "Degree Centrality": "{:.6f}",
+                "Betweenness Centrality": "{:.6f}",
+                "Closeness Centrality": "{:.6f}",
+                "Eigenvector Centrality": "{:.6f}",
+                "IKR Agregat": "{:.3f}",
+            }
+        ),
+        use_container_width=True,
+    )
+    st.download_button(
+        "Unduh Tabel Anonim",
+        data=df_profile[profile_cols].to_csv(index=False).encode("utf-8"),
+        file_name=f"profil_node_strategis_anonim_{selected_centrality_key}.csv",
+        mime="text/csv",
+        key=f"centrality_page_download_{selected_centrality_key}",
+    )
+
+    st.markdown("#### Komposisi Peran Struktural per Klaster dan Dusun")
+    role_cluster_df = df_view.groupby(["Klaster Louvain", "Peran Struktural"], as_index=False).size().rename(columns={"size": "Jumlah Node"})
+    role_dusun_col = "Dusun/Kode Dusun" if publish_mode else "Dusun"
+    role_dusun_df = df_view.groupby([role_dusun_col, "Peran Struktural"], as_index=False).size().rename(columns={"size": "Jumlah Node"})
+    rc1, rc2 = st.columns(2)
+    with rc1:
+        fig_role_cluster = px.bar(role_cluster_df, x="Klaster Louvain", y="Jumlah Node", color="Peran Struktural", barmode="stack", color_discrete_map=CENTRALITY_ROLE_COLORS, category_orders={"Peran Struktural": CENTRALITY_ROLE_ORDER}, title="Komposisi Peran Struktural per Klaster")
+        style_publication_figure(fig_role_cluster, title="Komposisi Peran Struktural per Klaster", height=430, xaxis_title="Klaster Louvain", yaxis_title="Jumlah node", legend_title="Peran Struktural")
+        st.plotly_chart(fig_role_cluster, use_container_width=True, config=PLOTLY_DRAW_CONFIG)
+    with rc2:
+        fig_role_dusun = px.bar(role_dusun_df, x=role_dusun_col, y="Jumlah Node", color="Peran Struktural", barmode="stack", color_discrete_map=CENTRALITY_ROLE_COLORS, category_orders={"Peran Struktural": CENTRALITY_ROLE_ORDER}, title="Komposisi Peran Struktural per Dusun")
+        style_publication_figure(fig_role_dusun, title="Komposisi Peran Struktural per Dusun", height=430, xaxis_title="Dusun/Kode Dusun", yaxis_title="Jumlah node", legend_title="Peran Struktural")
+        st.plotly_chart(fig_role_dusun, use_container_width=True, config=PLOTLY_DRAW_CONFIG)
+
+    st.markdown("#### Top 5 Centrality per Pilar")
+    tabs = st.tabs([label.replace(" Centrality", "") for label, _ in all_centrality_specs])
+    for tab, (metric_label, _) in zip(tabs, all_centrality_specs):
+        with tab:
+            top_cols = unique_existing_columns(df_view, ["Kode Node", role_dusun_col, "Profesi/Pekerjaan", "IKR Agregat", metric_label, "Peran Struktural"])
+            st.dataframe(
+                df_view[top_cols].sort_values(metric_label, ascending=False).head(5).style.format({metric_label: "{:.6f}", "IKR Agregat": "{:.3f}"}),
+                use_container_width=True,
+            )
+
+    st.info(build_centrality_policy_narrative(df_view, centrality_name))
+    with subbab_dropdown("Catatan Etika dan Batasan Interpretasi", expanded=publish_mode):
+        st.markdown(
+            """
+            - Data mikro rumah tangga adalah data sensitif.
+            - Identitas individu/KK perlu disamarkan dalam visualisasi publik.
+            - Centrality tidak boleh dimaknai sebagai status sosial seseorang.
+            - Hasil centrality tidak membuktikan inclusion error atau exclusion error.
+            - Hasil hanya mendukung proses verifikasi, evaluasi, dan diskusi kebijakan.
+            - Verifikasi lapangan dan persetujuan penggunaan data tetap diperlukan.
+            - Hindari penyebutan nama orang, alamat spesifik, atau koordinat presisi pada materi presentasi/publikasi.
+            """
+        )
+
+
 def build_centrality_top_table_figure(df_table, title, score_col):
     if df_table is None or df_table.empty:
         return None
@@ -846,7 +2038,7 @@ def build_centrality_top_table_figure(df_table, title, score_col):
             go.Table(
                 columnwidth=[1.9, 1.3, 1.8, 1.0, 1.2],
                 header=dict(
-                    values=["Nama", "Dusun", "Pekerjaan", "IKR Agregat", "Skor Centrality"],
+                    values=["Node", "Dusun/Kode", "Pekerjaan", "IKR Agregat", "Skor Centrality"],
                     fill_color="#0F172A",
                     font=dict(color="#F8FAFC", size=13),
                     align="left",
@@ -902,11 +2094,11 @@ def build_spatial_node_figure(
     title,
     spatial_mode="Spasial OSM",
     marker_size=11,
-    colorscale="Turbo",
+    colorscale="Viridis",
     colorbar=None,
     cmin=None,
     cmax=None,
-    line_color="#0f172a",
+    line_color=NETWORK_NODE_LINE,
     line_width=0.6,
 ):
     if graph_obj is None or graph_obj.number_of_nodes() == 0:
@@ -976,9 +2168,9 @@ def build_spatial_node_figure(
     else:
         mapbox_cfg["style"] = "open-street-map"
     fig.update_layout(
-        title=title,
+        title=dict(text=title, x=0.02, xanchor="left"),
         height=560,
-        template="plotly_white",
+        template=PUBLICATION_TEMPLATE,
         margin=dict(l=20, r=20, t=60, b=20),
         mapbox=mapbox_cfg,
     )
@@ -1261,9 +2453,9 @@ def build_spatial_category_figure(
         mapbox_cfg["style"] = "open-street-map"
 
     fig.update_layout(
-        title=title,
+        title=dict(text=title, x=0.02, xanchor="left"),
         height=620,
-        template="plotly_white",
+        template=PUBLICATION_TEMPLATE,
         margin=dict(l=20, r=20, t=60, b=20),
         legend=dict(
             title=dict(text=category_col),
@@ -1348,9 +2540,9 @@ def build_spatial_numeric_figure(
         mapbox_cfg["style"] = "open-street-map"
 
     fig.update_layout(
-        title=title,
+        title=dict(text=title, x=0.02, xanchor="left"),
         height=620,
-        template="plotly_white",
+        template=PUBLICATION_TEMPLATE,
         margin=dict(l=20, r=20, t=60, b=20),
         mapbox=mapbox_cfg,
     )
@@ -1363,14 +2555,14 @@ def render_bansos_spatial_analysis_page(
     partition,
     spatial_mode="Spasial ArcGIS",
     selected_dimension_col="f_a_dari_rekap_kk",
-    map_color_mode="F_IKR Agregat",
+    map_color_mode="IKR Agregat",
     filter_mode="Semua KK",
     dim_thresholds=None,
 ):
     st.markdown("<h1 class='main-header'>Analisis Bansos Spasial</h1>", unsafe_allow_html=True)
     st.markdown(
         "<div class='premium-hero'><b>Fokus Halaman:</b> memetakan penerima bansos berdasarkan "
-        "dimensi IKR yang dipilih. Warna node selalu mengikuti <b>F_IKR agregat</b> sebagai tingkat "
+        "dimensi IKR yang dipilih. Warna node selalu mengikuti <b>IKR agregat</b> sebagai tingkat "
         "kesejahteraan ekonomi, sedangkan detail hover menampilkan skor dimensi dan jenis bansos yang diterima.</div>",
         unsafe_allow_html=True,
     )
@@ -1473,7 +2665,7 @@ def render_bansos_spatial_analysis_page(
         f"<div class='soft-card'><b>Interpretasi Cepat:</b><br>"
         f"Qw* = <b>{q_w_star:.3f}</b> menunjukkan kekompakan kategori BPS di dalam klaster, "
         f"sedangkan Qb* = <b>{q_b_star:.3f}</b> membaca kemiripan strata BPS antar-klaster. "
-        f"Pada page ini, <b>warna node memakai F_IKR agregat</b> sebagai base kesejahteraan ekonomi, "
+        f"Pada page ini, <b>warna node memakai IKR agregat</b> sebagai base kesejahteraan ekonomi, "
         f"sedangkan analisis bansos dibaca dari dimensi terpilih <b>{selected_dimension_label}</b> "
         f"dengan ambang <b>{selected_threshold:.1f}</b>.</div>",
         unsafe_allow_html=True,
@@ -1519,7 +2711,7 @@ def render_bansos_spatial_analysis_page(
             f"<br>Jenis Bansos: {row.get('Jenis Bansos', '-')}"
             f"<br>Status BPS-Bansos: {row.get('Status BPS-Bansos', '-')}"
             f"<br>Kategori BPS: {row.get('kategori_ikr', '-')}"
-            f"<br>F_IKR: {_safe_float_metric(row.get('F_IKR'), default=np.nan):.2f}"
+            f"<br>IKR Agregat: {_safe_float_metric(row.get('F_IKR'), default=np.nan):.2f}"
             f"<br>{selected_dimension_label}: {_safe_float_metric(row.get('Skor Dimensi Pilihan'), default=np.nan):.2f}"
             f"<br>Status Dimensi: {row.get('Status Dimensi Pilihan', '-')}"
             f"<br>Cluster: {row.get('Cluster Louvain', '-')}"
@@ -1573,7 +2765,7 @@ def render_bansos_spatial_analysis_page(
                     spatial_mode=spatial_mode,
                     marker_size_col="bansos_num",
                     colorscale="RdYlGn",
-                    colorbar_title="F_IKR Agregat",
+                    colorbar_title="IKR Agregat",
                 )
             if fig_map is not None:
                 st.plotly_chart(fig_map, use_container_width=True, config=PLOTLY_DRAW_CONFIG)
@@ -1642,10 +2834,11 @@ def render_bansos_spatial_analysis_page(
         symbol="kategori_ikr",
         hover_data=["nama", "family_id", "Jenis Bansos", "Cluster Louvain"],
         color_discrete_map={"Penerima": "#0f766e", "Non-Penerima": "#b91c1c"},
-        title=f"Relasi {selected_dimension_label} terhadap F_IKR dan Penerimaan Bansos",
+        labels={"F_IKR": "IKR Agregat", "Skor Dimensi Pilihan": selected_dimension_label},
+        title=f"Relasi {selected_dimension_label} terhadap IKR Agregat dan Penerimaan Bansos",
     )
     fig_focus.add_vline(x=selected_threshold, line_dash="dash", line_color="#475569")
-    fig_focus.update_layout(template="plotly_white", height=460, xaxis_title=selected_dimension_label, yaxis_title="F_IKR")
+    fig_focus.update_layout(template="plotly_white", height=460, xaxis_title=selected_dimension_label, yaxis_title="IKR Agregat")
     st.plotly_chart(fig_focus, use_container_width=True, config=PLOTLY_DRAW_CONFIG)
 
     detail_cols = [
@@ -1666,11 +2859,19 @@ def render_bansos_spatial_analysis_page(
         detail_cols += [lat_col, lon_col]
     detail_cols = [col for col in detail_cols if col in df_nodes.columns]
     st.markdown("### Detail Rumah Tangga")
+    detail_display_df = df_nodes[detail_cols].sort_values(
+        ["Status Dimensi Pilihan", "Status Bansos", "F_IKR"],
+        ascending=[True, True, True],
+    )
+    detail_display_df = detail_display_df.rename(
+        columns={
+            **{col: label for label, col in IKR_DIMENSION_MAP},
+            "F_IKR": "IKR Agregat",
+            "kategori_ikr": "Kategori IKR",
+        }
+    )
     st.dataframe(
-        df_nodes[detail_cols].sort_values(
-            ["Status Dimensi Pilihan", "Status Bansos", "F_IKR"],
-            ascending=[True, True, True],
-        ),
+        detail_display_df,
         use_container_width=True,
     )
 
@@ -1774,6 +2975,102 @@ def build_spatial_indicator_profile(
     return pd.DataFrame(rows)
 
 
+def build_dusun_cluster_composition(graph_obj, dusun_attr, partition=None):
+    if graph_obj is None or graph_obj.number_of_nodes() == 0 or not dusun_attr:
+        return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
+
+    rows = []
+    for n in graph_obj.nodes():
+        node_attr = graph_obj.nodes[n]
+        dusun_raw = node_attr.get(dusun_attr, "Tidak Valid")
+        dusun_name = str(dusun_raw).strip() if pd.notnull(dusun_raw) and str(dusun_raw).strip() else "Tidak Valid"
+        raw_cluster = partition.get(n, node_attr.get("cluster", -1)) if partition else node_attr.get("cluster", -1)
+        try:
+            cluster_id = int(raw_cluster)
+        except (TypeError, ValueError):
+            cluster_id = -1
+        rows.append(
+            {
+                "family_id": n,
+                "Dusun": dusun_name,
+                "ID Klaster Internal": cluster_id,
+            }
+        )
+
+    if not rows:
+        return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
+
+    df_nodes = pd.DataFrame(rows)
+    cluster_order = sorted(df_nodes["ID Klaster Internal"].dropna().unique().tolist())
+    valid_cluster_order = [cid for cid in cluster_order if cid >= 0]
+    cluster_label_map = {cid: f"Klaster {idx + 1}" for idx, cid in enumerate(valid_cluster_order)}
+    for cid in cluster_order:
+        if cid < 0:
+            cluster_label_map[cid] = "Tidak Terklaster"
+    df_nodes["Klaster Louvain"] = df_nodes["ID Klaster Internal"].map(cluster_label_map)
+    cluster_label_order = [cluster_label_map[cid] for cid in cluster_order]
+
+    df_long = (
+        df_nodes.groupby(["Dusun", "ID Klaster Internal", "Klaster Louvain"], as_index=False)
+        .size()
+        .rename(columns={"size": "Jumlah KK"})
+    )
+    dusun_totals = (
+        df_nodes.groupby("Dusun", as_index=False)
+        .size()
+        .rename(columns={"size": "Total KK Dusun"})
+    )
+    cluster_totals = (
+        df_nodes.groupby("Klaster Louvain", as_index=False)
+        .size()
+        .rename(columns={"size": "Total KK Klaster"})
+    )
+    total_kk = int(df_nodes.shape[0])
+    df_long = df_long.merge(dusun_totals, on="Dusun", how="left").merge(cluster_totals, on="Klaster Louvain", how="left")
+    df_long["Persentase dalam Dusun (%)"] = np.where(
+        df_long["Total KK Dusun"] > 0,
+        (df_long["Jumlah KK"] / df_long["Total KK Dusun"]) * 100.0,
+        0.0,
+    )
+    df_long["Persentase dari Total Graf (%)"] = (df_long["Jumlah KK"] / max(total_kk, 1)) * 100.0
+    df_long["Persentase dari Klaster (%)"] = np.where(
+        df_long["Total KK Klaster"] > 0,
+        (df_long["Jumlah KK"] / df_long["Total KK Klaster"]) * 100.0,
+        0.0,
+    )
+    df_long["Label Persen"] = df_long["Persentase dalam Dusun (%)"].map(lambda v: f"{v:.1f}%" if v >= 5 else "")
+    df_long = df_long.sort_values(["Dusun", "ID Klaster Internal"]).reset_index(drop=True)
+
+    count_pivot = (
+        df_long.pivot_table(index="Dusun", columns="Klaster Louvain", values="Jumlah KK", aggfunc="sum", fill_value=0)
+        .reindex(columns=cluster_label_order, fill_value=0)
+        .astype(int)
+    )
+    pct_pivot = (
+        df_long.pivot_table(index="Dusun", columns="Klaster Louvain", values="Persentase dalam Dusun (%)", aggfunc="sum", fill_value=0.0)
+        .reindex(columns=cluster_label_order, fill_value=0.0)
+    )
+    wide_rows = dusun_totals.set_index("Dusun").sort_index().copy()
+    for cluster_label in cluster_label_order:
+        wide_rows[f"{cluster_label} - Jumlah KK"] = count_pivot.get(cluster_label, pd.Series(0, index=wide_rows.index)).reindex(wide_rows.index, fill_value=0).astype(int)
+        wide_rows[f"{cluster_label} - Persentase (%)"] = pct_pivot.get(cluster_label, pd.Series(0.0, index=wide_rows.index)).reindex(wide_rows.index, fill_value=0.0)
+    df_wide = wide_rows.reset_index()
+
+    df_overall = (
+        df_nodes.groupby(["ID Klaster Internal", "Klaster Louvain"], as_index=False)
+        .size()
+        .rename(columns={"size": "Jumlah KK"})
+        .sort_values("ID Klaster Internal")
+        .reset_index(drop=True)
+    )
+    df_overall["Persentase KK (%)"] = (df_overall["Jumlah KK"] / max(total_kk, 1)) * 100.0
+    df_overall["Label Batang"] = df_overall.apply(
+        lambda r: f"{int(r['Jumlah KK'])} KK ({float(r['Persentase KK (%)']):.1f}%)",
+        axis=1,
+    )
+    return df_long, df_wide, df_overall
+
+
 def build_ikr_assortativity_table(graph_obj, dimension_map=None):
     dimension_map = dimension_map or IKR_DIMENSION_MAP
     rows = []
@@ -1783,7 +3080,8 @@ def build_ikr_assortativity_table(graph_obj, dimension_map=None):
     rows.append(
         {
             "Dimensi IKR": overall_label,
-            "Kolom Database": overall_col,
+            "Sumber Skor": format_dimension_source_label(overall_col),
+            "Kolom Internal": overall_col,
             "Assortativity r": float(r_overall),
             "Arah": dir_overall,
             "Kekuatan": lvl_overall,
@@ -1796,7 +3094,8 @@ def build_ikr_assortativity_table(graph_obj, dimension_map=None):
         rows.append(
             {
                 "Dimensi IKR": dim_label,
-                "Kolom Database": col_name,
+                "Sumber Skor": format_dimension_source_label(col_name),
+                "Kolom Internal": col_name,
                 "Assortativity r": float(r_val),
                 "Arah": direction,
                 "Kekuatan": strength,
@@ -1809,14 +3108,16 @@ def build_ikr_assortativity_table(graph_obj, dimension_map=None):
 def compute_base_five_dimension_summary(df_assort):
     if df_assort is None or df_assort.empty:
         return None
-    df_dims = df_assort[df_assort["Kolom Database"].isin(EDGE_REKAP_COLS)].copy()
+    filter_col = "Kolom Internal" if "Kolom Internal" in df_assort.columns else "Kolom Database"
+    df_dims = df_assort[df_assort[filter_col].isin(EDGE_REKAP_COLS)].copy()
     if df_dims.empty:
         return None
     r_mean = float(df_dims["Assortativity r"].mean())
     direction, strength = interpret_assortativity_value(r_mean)
     return {
-        "Dimensi IKR": "Ringkasan 5 Dimensi Base Graph (Rata-rata r F_A..F_E)",
-        "Kolom Database": "f_a..f_e (summary)",
+        "Dimensi IKR": "Ringkasan Lima Dimensi Kesejahteraan",
+        "Sumber Skor": "Rata-rata koefisien lima dimensi penyusun",
+        "Kolom Internal": "ringkasan_lima_dimensi",
         "Assortativity r": r_mean,
         "Arah": direction,
         "Kekuatan": strength,
@@ -1926,6 +3227,7 @@ def build_sna_network(
     df_v,
     basis_col,
     threshold_val=None,
+    auto_threshold=True,
     lcc_only=True,
     similarity_method="cosine",
     force_louvain_lcc=False,
@@ -1944,6 +3246,7 @@ def build_sna_network(
     G = nx.Graph()
     threshold_used = 0.4
     threshold_distribution = []
+    threshold_sensitivity = []
     pairwise_similarity_values = []
     if not edge_feature_cols:
         st.error("Kolom fitur edge belum ditentukan.")
@@ -1993,10 +3296,28 @@ def build_sna_network(
                 sim_weight = compute_pearson_similarity(vec_i, vec_j)
             pairwise_similarity_values.append(float(sim_weight))
             candidate_edges.append((ids[i], ids[j], float(sim_weight)))
-    threshold_used, threshold_distribution = compute_auto_threshold_from_distribution(
-        pairwise_similarity_values,
-        threshold_grid=threshold_grid,
-    )
+    if auto_threshold:
+        threshold_used, threshold_distribution = compute_auto_threshold_from_distribution(
+            pairwise_similarity_values,
+            threshold_grid=threshold_grid,
+        )
+        threshold_sensitivity = compute_threshold_sensitivity_analysis(
+            ids,
+            candidate_edges,
+            threshold_grid=threshold_grid,
+            lcc_only=lcc_only,
+            force_louvain_lcc=force_louvain_lcc,
+        )
+        threshold_sensitivity = merge_threshold_distribution_with_sensitivity(
+            threshold_distribution,
+            threshold_sensitivity,
+        )
+        threshold_distribution = threshold_sensitivity
+    else:
+        try:
+            threshold_used = float(threshold_val)
+        except (TypeError, ValueError):
+            threshold_used = 0.4
     for u, v, sim_weight in candidate_edges:
         if sim_weight >= threshold_used:
             G.add_edge(u, v, weight=sim_weight)
@@ -2042,8 +3363,9 @@ def build_sna_network(
         "lcc_edges": G_lcc.number_of_edges(),
         "similarity_method": method_norm,
         "threshold_selected": threshold_used,
-        "threshold_auto": True,
+        "threshold_auto": bool(auto_threshold),
         "threshold_distribution": threshold_distribution,
+        "threshold_sensitivity": threshold_sensitivity,
         "pairwise_similarity_values": pairwise_similarity_values,
         "mode": "LCC only" if lcc_only else "Semua komponen",
         "onehot_round_decimals": int(onehot_round_decimals),
@@ -2066,11 +3388,25 @@ def render_weighting_methods_page(
         "dengan <b>Cosine Similarity</b> pada representasi one-hot dari 5 dimensi IKR.</div>",
         unsafe_allow_html=True,
     )
-    feature_cols = ("F_A", "F_B", "F_C", "F_D", "F_E")
+    feature_cols = PSEUDO_DIMENSION_COLS
     pseudo_two_nodes = pd.DataFrame(
         [
-            {"family_id": "KK_A", "F_A": 33, "F_B": 70, "F_C": 55, "F_D": 80, "F_E": 61},
-            {"family_id": "KK_B", "F_A": 33, "F_B": 70, "F_C": 55, "F_D": 79, "F_E": 62},
+            {
+                "family_id": "KK_A",
+                "Sandang, Pangan, dan Papan": 33,
+                "Pendidikan": 70,
+                "Sosial, Hukum, dan HAM": 55,
+                "Kesehatan dan Pekerjaan": 80,
+                "Lingkungan dan Infrastruktur": 61,
+            },
+            {
+                "family_id": "KK_B",
+                "Sandang, Pangan, dan Papan": 33,
+                "Pendidikan": 70,
+                "Sosial, Hukum, dan HAM": 55,
+                "Kesehatan dan Pekerjaan": 79,
+                "Lingkungan dan Infrastruktur": 62,
+            },
         ]
     )
     pseudo_for_onehot = pseudo_two_nodes.copy()
@@ -2087,8 +3423,8 @@ def render_weighting_methods_page(
     with tab_alur:
         st.markdown(
             "<div class='soft-card'><b>Alur Pembentukan Bobot Edge</b><br>"
-            "Input dimensi: <b>F_A (Sandang/Pangan/Papan), F_B (Pendidikan), F_C (Sosial/Hukum), "
-            "F_D (Kesehatan/Pekerjaan), F_E (Lingkungan/Infrastruktur)</b>.<br>"
+            "Input dimensi: <b>Sandang, Pangan, dan Papan; Pendidikan; Sosial, Hukum, dan HAM; "
+            "Kesehatan dan Pekerjaan; Lingkungan dan Infrastruktur</b>.<br>"
             "Setiap <b>kepala keluarga (KK)</b> didefinisikan sebagai satu node.<br>"
             "Pembuatan edge dimulai dari pembobotan similarity antar-node (Cosine).<br>"
             "Aturan keputusan threshold:<br>"
@@ -2103,7 +3439,7 @@ def render_weighting_methods_page(
                 {"Tahap": "Mulai", "Deskripsi": "Inisialisasi pembentukan graf base."},
                 {
                     "Tahap": "Input 5 Dimensi",
-                    "Deskripsi": "Masukkan F_A, F_B, F_C, F_D, F_E per KK (masing-masing dari rekap dimensi IKR).",
+                    "Deskripsi": "Masukkan lima skor dimensi kesejahteraan per KK dari rekap IKR.",
                 },
                 {"Tahap": "Definisi Node", "Deskripsi": "Setiap kepala keluarga (KK) didefinisikan sebagai 1 node."},
                 {
@@ -2215,11 +3551,11 @@ def render_weighting_methods_page(
         st.markdown("#### Distribusi Cosine dari Sampel Pseudo")
         rng = np.random.default_rng(42)
         value_pool = {
-            "F_A": [33.40, 33.50, 33.60, 34.00],
-            "F_B": [70.00, 70.50, 71.00, 71.50],
-            "F_C": [55.00, 55.20, 55.40, 55.60],
-            "F_D": [79.50, 80.00, 80.50, 81.00],
-            "F_E": [61.20, 61.30, 61.40, 61.50],
+            "Sandang, Pangan, dan Papan": [33.40, 33.50, 33.60, 34.00],
+            "Pendidikan": [70.00, 70.50, 71.00, 71.50],
+            "Sosial, Hukum, dan HAM": [55.00, 55.20, 55.40, 55.60],
+            "Kesehatan dan Pekerjaan": [79.50, 80.00, 80.50, 81.00],
+            "Lingkungan dan Infrastruktur": [61.20, 61.30, 61.40, 61.50],
         }
         n_nodes = int(max(20, sample_max_nodes))
         pseudo_nodes = []
@@ -2277,7 +3613,7 @@ def render_louvain_methods_page(
     st.markdown("<h1 class='main-header'>Halaman Metode Louvain (Simulasi Pseudo)</h1>", unsafe_allow_html=True)
     st.markdown(
         "<div class='premium-hero'><b>Fokus Halaman:</b> Menjelaskan logika penerapan Louvain dari graf base berbobot "
-        "yang dibangun dari data pseudo 5 dimensi IKR.</div>",
+        "yang dibangun dari data pseudo lima dimensi kesejahteraan.</div>",
         unsafe_allow_html=True,
     )
     tab_alur, tab_rumus, tab_sim, tab_out = st.tabs(
@@ -2331,22 +3667,22 @@ def render_louvain_methods_page(
     # Bangun graf base pseudo dari 5 dimensi, lalu jalankan Louvain.
     rng = np.random.default_rng(int(seed))
     pools = {
-        "F_A": [33.40, 33.50, 33.60, 34.00],
-        "F_B": [70.00, 70.50, 71.00, 71.50],
-        "F_C": [55.00, 55.20, 55.40, 55.60],
-        "F_D": [79.50, 80.00, 80.50, 81.00],
-        "F_E": [61.20, 61.30, 61.40, 61.50],
+        "Sandang, Pangan, dan Papan": [33.40, 33.50, 33.60, 34.00],
+        "Pendidikan": [70.00, 70.50, 71.00, 71.50],
+        "Sosial, Hukum, dan HAM": [55.00, 55.20, 55.40, 55.60],
+        "Kesehatan dan Pekerjaan": [79.50, 80.00, 80.50, 81.00],
+        "Lingkungan dan Infrastruktur": [61.20, 61.30, 61.40, 61.50],
     }
     pseudo_rows = []
     for i in range(int(max(20, n_nodes))):
         row = {"family_id": f"LV_{i+1:03d}"}
-        for c in ["F_A", "F_B", "F_C", "F_D", "F_E"]:
+        for c in PSEUDO_DIMENSION_COLS:
             row[c] = float(rng.choice(pools[c]))
         pseudo_rows.append(row)
     pseudo_df = pd.DataFrame(pseudo_rows)
     onehot = build_onehot_feature_matrix(
         pseudo_df,
-        ("F_A", "F_B", "F_C", "F_D", "F_E"),
+        PSEUDO_DIMENSION_COLS,
         rounding_decimals=rounding_decimals,
     )
 
@@ -2393,12 +3729,20 @@ def render_louvain_methods_page(
             comm_ids = [final_partition.get(n, 0) for n in nodes]
             fig_graph = go.Figure()
             for u, v, d in G.edges(data=True):
+                cu = int(final_partition.get(u, 0))
+                cv = int(final_partition.get(v, 0))
+                edge_weight = _safe_float_metric(d.get("weight"), 0.0)
+                edge_color = (
+                    rgba_from_hex(CONTRAST_COLORS[cu % len(CONTRAST_COLORS)], 0.44)
+                    if cu == cv
+                    else rgba_from_hex(CONTRAST_COLORS[((cu + 1) * 7 + (cv + 1) * 13) % len(CONTRAST_COLORS)], 0.32)
+                )
                 fig_graph.add_trace(
                     go.Scatter(
                         x=[pos[u][0], pos[v][0], None],
                         y=[pos[u][1], pos[v][1], None],
                         mode="lines",
-                        line=dict(width=1.0 + 1.6 * _safe_float_metric(d.get("weight"), 0.0), color="rgba(51,65,85,0.45)"),
+                        line=dict(width=1.0 + (1.6 * edge_weight), color=edge_color),
                         hoverinfo="none",
                         showlegend=False,
                     )
@@ -2414,7 +3758,7 @@ def render_louvain_methods_page(
                         colorscale="Blues",
                         showscale=True,
                         colorbar=dict(title="Komunitas"),
-                        line=dict(color="#0f172a", width=0.6),
+                                        line=dict(color=NETWORK_NODE_LINE, width=0.7),
                     ),
                     text=[f"Node: {n}<br>Komunitas: {final_partition.get(n, 0)}" for n in nodes],
                     hoverinfo="text",
@@ -2467,42 +3811,66 @@ def render_louvain_methods_page(
                 pseudo_profile.groupby("Komunitas Louvain", as_index=False)
                 .agg(
                     Jumlah_Node=("family_id", "count"),
-                    Rerata_F_A=("F_A", "mean"),
-                    Rerata_F_B=("F_B", "mean"),
-                    Rerata_F_C=("F_C", "mean"),
-                    Rerata_F_D=("F_D", "mean"),
-                    Rerata_F_E=("F_E", "mean"),
+                    Rerata_Sandang_Pangan_Papan=("Sandang, Pangan, dan Papan", "mean"),
+                    Rerata_Pendidikan=("Pendidikan", "mean"),
+                    Rerata_Sosial_Hukum_HAM=("Sosial, Hukum, dan HAM", "mean"),
+                    Rerata_Kesehatan_Pekerjaan=("Kesehatan dan Pekerjaan", "mean"),
+                    Rerata_Lingkungan_Infrastruktur=("Lingkungan dan Infrastruktur", "mean"),
                     Rerata_Weighted_Degree=("Weighted Degree", "mean"),
                 )
                 .sort_values("Komunitas Louvain")
                 .reset_index(drop=True)
             )
-            cluster_desc["Rerata_F_IKR"] = cluster_desc[
-                ["Rerata_F_A", "Rerata_F_B", "Rerata_F_C", "Rerata_F_D", "Rerata_F_E"]
+            cluster_desc["Rerata_IKR_Agregat"] = cluster_desc[
+                [
+                    "Rerata_Sandang_Pangan_Papan",
+                    "Rerata_Pendidikan",
+                    "Rerata_Sosial_Hukum_HAM",
+                    "Rerata_Kesehatan_Pekerjaan",
+                    "Rerata_Lingkungan_Infrastruktur",
+                ]
             ].mean(axis=1)
             st.markdown("#### Statistik Deskriptif per Klaster")
             st.dataframe(
                 cluster_desc.style.format(
                     {
-                        "Rerata_F_A": "{:.2f}",
-                        "Rerata_F_B": "{:.2f}",
-                        "Rerata_F_C": "{:.2f}",
-                        "Rerata_F_D": "{:.2f}",
-                        "Rerata_F_E": "{:.2f}",
-                        "Rerata_F_IKR": "{:.2f}",
+                        "Rerata_Sandang_Pangan_Papan": "{:.2f}",
+                        "Rerata_Pendidikan": "{:.2f}",
+                        "Rerata_Sosial_Hukum_HAM": "{:.2f}",
+                        "Rerata_Kesehatan_Pekerjaan": "{:.2f}",
+                        "Rerata_Lingkungan_Infrastruktur": "{:.2f}",
+                        "Rerata_IKR_Agregat": "{:.2f}",
                         "Rerata_Weighted_Degree": "{:.2f}",
                     }
                 ),
                 use_container_width=True,
             )
 
+            cluster_profile_long = cluster_desc.melt(
+                id_vars=["Komunitas Louvain"],
+                value_vars=[
+                    "Rerata_Sandang_Pangan_Papan",
+                    "Rerata_Pendidikan",
+                    "Rerata_Sosial_Hukum_HAM",
+                    "Rerata_Kesehatan_Pekerjaan",
+                    "Rerata_Lingkungan_Infrastruktur",
+                    "Rerata_IKR_Agregat",
+                ],
+                var_name="Indikator",
+                value_name="Rerata Nilai",
+            )
+            cluster_profile_long["Indikator"] = cluster_profile_long["Indikator"].map(
+                {
+                    "Rerata_Sandang_Pangan_Papan": "Sandang, Pangan, dan Papan",
+                    "Rerata_Pendidikan": "Pendidikan",
+                    "Rerata_Sosial_Hukum_HAM": "Sosial, Hukum, dan HAM",
+                    "Rerata_Kesehatan_Pekerjaan": "Kesehatan dan Pekerjaan",
+                    "Rerata_Lingkungan_Infrastruktur": "Lingkungan dan Infrastruktur",
+                    "Rerata_IKR_Agregat": "IKR Agregat",
+                }
+            )
             fig_cluster_profile = px.bar(
-                cluster_desc.melt(
-                    id_vars=["Komunitas Louvain"],
-                    value_vars=["Rerata_F_A", "Rerata_F_B", "Rerata_F_C", "Rerata_F_D", "Rerata_F_E", "Rerata_F_IKR"],
-                    var_name="Indikator",
-                    value_name="Rerata Nilai",
-                ),
+                cluster_profile_long,
                 x="Komunitas Louvain",
                 y="Rerata Nilai",
                 color="Indikator",
@@ -2515,7 +3883,7 @@ def render_louvain_methods_page(
             for _, row in cluster_desc.iterrows():
                 cid = int(row["Komunitas Louvain"])
                 n_k = int(row["Jumlah_Node"])
-                avg_ikr = float(row["Rerata_F_IKR"])
+                avg_ikr = float(row["Rerata_IKR_Agregat"])
                 ikr_lbl, _ = categorize_ikr_bps(avg_ikr)
                 if avg_ikr >= 75:
                     tone = "klaster relatif kuat secara skor dimensi"
@@ -2525,7 +3893,7 @@ def render_louvain_methods_page(
                     tone = "klaster dengan kerentanan dimensi yang perlu prioritas"
                 st.markdown(
                     f"<div class='soft-card'><b>Klaster {cid}</b> berisi <b>{n_k}</b> node, "
-                    f"rerata F_IKR simulasi <b>{avg_ikr:.2f}</b> (kategori <b>{ikr_lbl}</b>), "
+                    f"rerata IKR agregat simulasi <b>{avg_ikr:.2f}</b> (kategori <b>{ikr_lbl}</b>), "
                     f"dengan rerata weighted degree <b>{float(row['Rerata_Weighted_Degree']):.2f}</b>. "
                     f"Interpretasi cepat: {tone}.</div>",
                     unsafe_allow_html=True,
@@ -2659,7 +4027,8 @@ def render_assortativity_methods_page(
         st.markdown("#### 3) Within-Between Assortativity (Montes)")
         st.latex(r"Q_w^* = \frac{Q_w}{Q_{w,\max}},\quad Q_b^* = \frac{Q_b}{Q_{b,\max}}")
         st.caption(
-            "Di kode ini: numeric assortativity untuk F_A..F_E dan F_IKR; attribute assortativity untuk bansos/internet/ponsel/dusun; "
+            "Di kode ini: numeric assortativity dihitung untuk lima dimensi kesejahteraan dan IKR agregat; "
+            "attribute assortativity untuk bansos, internet, ponsel, dan dusun; "
             "Within-Between memakai kategori IKR (BPS) sebagai category_attr dan klaster sebagai group_attr."
         )
         cara_baca_df = pd.DataFrame(
@@ -2676,7 +4045,7 @@ def render_assortativity_methods_page(
         jenis_df = pd.DataFrame(
             [
                 {
-                    "Objek/Metrik": "F_A, F_B, F_C, F_D, F_E, F_IKR",
+                    "Objek/Metrik": "Lima dimensi kesejahteraan dan IKR agregat",
                     "Jenis Assortativity": "Numeric Assortativity",
                     "Alasan Metodologis": "Nilai berbentuk skor kontinu, sehingga yang diukur adalah korelasi nilai antar-node pada edge.",
                     "Rumus Inti": "r = corr(x_u, x_v) pada edge (u,v)",
@@ -2741,20 +4110,13 @@ def render_assortativity_methods_page(
             }
         )
     df_edges = pd.DataFrame(edge_pairs)
-    numeric_specs = [
-        ("F_A", "f_a_dari_rekap_kk"),
-        ("F_B", "f_b_dari_rekap_kk"),
-        ("F_C", "f_c_dari_rekap_kk"),
-        ("F_D", "f_d_dari_rekap_kk"),
-        ("F_E", "f_e_dari_rekap_kk"),
-        ("F_IKR", "f_ikr_dari_rekap_kk"),
-    ]
+    numeric_specs = list(IKR_DIMENSION_MAP) + [IKR_OVERALL_METRIC]
     numeric_rows = []
     for lbl, col in numeric_specs:
         r_val = safe_numeric_assortativity(G, col, default=0.0)
         direction, strength = interpret_assortativity_value(r_val)
         numeric_rows.append(
-            {"Metrik": lbl, "Kolom": col, "r": float(r_val), "Arah": direction, "Kekuatan": strength}
+            {"Metrik": lbl, "Sumber Skor": format_dimension_source_label(col), "r": float(r_val), "Arah": direction, "Kekuatan": strength}
         )
     df_num = pd.DataFrame(numeric_rows)
 
@@ -2778,7 +4140,7 @@ def render_assortativity_methods_page(
             color_continuous_scale="Blues",
             range_color=[-1, 1],
             title="Perbandingan Numeric Assortativity",
-            hover_data=["Kolom", "Arah", "Kekuatan"],
+            hover_data=["Sumber Skor", "Arah", "Kekuatan"],
         )
         fig_num.add_vline(x=0.0, line_dash="dash", line_color="#475569")
         fig_num.update_traces(text=df_num_sorted["r"].map(lambda x: f"{x:.3f}"), textposition="outside")
@@ -2792,12 +4154,12 @@ def render_assortativity_methods_page(
             unsafe_allow_html=True,
         )
         numeric_pair_map = {
-            "F_A": ("f_a_u", "f_a_v"),
-            "F_B": ("f_b_u", "f_b_v"),
-            "F_C": ("f_c_u", "f_c_v"),
-            "F_D": ("f_d_u", "f_d_v"),
-            "F_E": ("f_e_u", "f_e_v"),
-            "F_IKR": ("f_ikr_u", "f_ikr_v"),
+            "Sandang, Pangan, dan Papan": ("f_a_u", "f_a_v"),
+            "Pendidikan": ("f_b_u", "f_b_v"),
+            "Sosial, Hukum, dan HAM": ("f_c_u", "f_c_v"),
+            "Kesehatan dan Pekerjaan": ("f_d_u", "f_d_v"),
+            "Lingkungan dan Infrastruktur": ("f_e_u", "f_e_v"),
+            "IKR Agregat": ("f_ikr_u", "f_ikr_v"),
         }
         chosen_metric = st.selectbox(
             "Visual Pair Nilai per Edge (Numeric)",
@@ -3279,12 +4641,20 @@ def render_centrality_methods_page(
         size_vals = [9.0 + (22.0 * float(deg_vals.get(n, 0.0)) / max(max(deg_vals.values()) if deg_vals else 1.0, 1e-9)) for n in nodes]
         fig_graph = go.Figure()
         for u, v, d in G.edges(data=True):
+            cu = int(partition.get(u, 0))
+            cv = int(partition.get(v, 0))
+            edge_weight = _safe_float_metric(d.get("weight"), 0.0)
+            edge_color = (
+                rgba_from_hex(CONTRAST_COLORS[cu % len(CONTRAST_COLORS)], 0.44)
+                if cu == cv
+                else rgba_from_hex(CONTRAST_COLORS[((cu + 1) * 7 + (cv + 1) * 13) % len(CONTRAST_COLORS)], 0.32)
+            )
             fig_graph.add_trace(
                 go.Scatter(
                     x=[pos[u][0], pos[v][0], None],
                     y=[pos[u][1], pos[v][1], None],
                     mode="lines",
-                    line=dict(width=1.0 + 1.6 * _safe_float_metric(d.get("weight"), 0.0), color="rgba(51,65,85,0.45)"),
+                    line=dict(width=1.0 + (1.6 * edge_weight), color=edge_color),
                     hoverinfo="none",
                     showlegend=False,
                 )
@@ -3297,10 +4667,10 @@ def render_centrality_methods_page(
                 marker=dict(
                     size=size_vals,
                     color=[float(eig_vals.get(n, 0.0)) for n in nodes],
-                    colorscale="Turbo",
+                                    colorscale="Viridis",
                     showscale=True,
                     colorbar=dict(title="Eigenvector"),
-                    line=dict(color="#0f172a", width=0.6),
+                    line=dict(color=NETWORK_NODE_LINE, width=0.7),
                 ),
                 text=[
                     f"Node: {n}<br>Klaster: {int(partition.get(n, 0))}"
@@ -3395,7 +4765,16 @@ with st.sidebar:
         )
 page_mode = st.sidebar.radio(
     "Pilih Halaman",
-    ["Dashboard Audit", "Analisis Bansos Spasial", "Metode Pembobotan", "Metode Louvain", "Metode Assortativity", "Metode Centrality"],
+    [
+        "Dashboard Audit",
+        "Rangkuman Threshold Otomatis",
+        "Analisis Centrality",
+        "Analisis Bansos Spasial",
+        "Metode Pembobotan",
+        "Metode Louvain",
+        "Metode Assortativity",
+        "Metode Centrality",
+    ],
     index=0,
 )
 st.sidebar.caption(f"Mode aktif: {page_mode}")
@@ -3408,6 +4787,14 @@ if page_mode == "Metode Louvain" and not uploaded_file:
 if page_mode == "Analisis Bansos Spasial" and not uploaded_file:
     st.markdown("<h1 class='main-header'>Analisis Bansos Spasial</h1>", unsafe_allow_html=True)
     st.info("Unggah database desa terlebih dahulu untuk menampilkan peta ArcGIS analisis bansos.")
+    st.stop()
+if page_mode == "Rangkuman Threshold Otomatis" and not uploaded_file:
+    st.markdown("<h1 class='main-header'>Rangkuman Threshold Otomatis</h1>", unsafe_allow_html=True)
+    st.info("Unggah database desa terlebih dahulu untuk menjalankan sensitivity analysis threshold otomatis.")
+    st.stop()
+if page_mode == "Analisis Centrality" and not uploaded_file:
+    st.markdown("<h1 class='main-header'>Analisis Centrality</h1>", unsafe_allow_html=True)
+    st.info("Unggah database desa terlebih dahulu untuk menampilkan analisis centrality berbasis jaringan Louvain.")
     st.stop()
 if page_mode == "Metode Pembobotan" and not uploaded_file:
     render_weighting_methods_page(
@@ -3466,7 +4853,7 @@ if uploaded_file:
         )
         threshold_grid = [round(x, 1) for x in np.arange(0.1, 1.0, 0.1)]
 
-        if page_mode == "Dashboard Audit":
+        if page_mode in {"Dashboard Audit", "Rangkuman Threshold Otomatis", "Analisis Centrality"}:
             basis_col = st.selectbox("Basis Jaringan", available_basis, format_func=lambda x: x[0])[1]
             weighting_mode = st.selectbox(
                 "Metode Pembobotan Graf",
@@ -3477,53 +4864,71 @@ if uploaded_file:
                 ],
                 format_func=lambda x: x[0],
             )[1]
-            threshold_mode = st.radio("Mode Threshold", ["Otomatis (Distribusi)", "Manual"], index=0)
-            auto_threshold_mode = threshold_mode.startswith("Otomatis")
-            if auto_threshold_mode:
+            if page_mode in {"Rangkuman Threshold Otomatis", "Analisis Centrality"}:
+                auto_threshold_mode = True
                 threshold_val = 0.40
+                if page_mode == "Rangkuman Threshold Otomatis":
+                    st.caption("Halaman ini menjalankan threshold otomatis dan membandingkan seluruh kandidat ambang.")
+                else:
+                    st.caption("Halaman ini memakai graf Louvain yang sama, lalu fokus pada centrality dan interpretasi kebijakan.")
             else:
-                threshold_val = st.slider("Threshold Manual", 0.1, 0.9, 0.4, 0.1)
-                st.caption("Threshold manual aktif: edge dibentuk jika similarity >= threshold.")
+                threshold_mode = st.radio("Mode Threshold", ["Otomatis (Distribusi)", "Manual"], index=0)
+                auto_threshold_mode = threshold_mode.startswith("Otomatis")
+                if auto_threshold_mode:
+                    threshold_val = 0.40
+                else:
+                    threshold_val = st.slider("Threshold Manual", 0.1, 0.9, 0.4, 0.1)
+                    st.caption("Threshold manual aktif: edge dibentuk jika similarity >= threshold.")
             comp_mode = st.radio("Mode Komponen", ["LCC only", "Semua komponen"], index=0, help="LCC only menganalisis komponen terbesar saja.")
             lcc_only = comp_mode == "LCC only"
-            layout_spread = st.slider(
-                "Layout Spread Graf",
-                min_value=0.8,
-                max_value=2.2,
-                value=1.35,
-                step=0.05,
-                help="Semakin besar nilai ini, posisi node makin renggang untuk mengurangi tumpang tindih.",
-            )
-            selected_dim_key = st.selectbox(
-                "Drill-Down Dimensi",
-                options=list(DRILLDOWN_DIMENSIONS.keys()),
-                format_func=lambda k: DRILLDOWN_DIMENSIONS[k]["label"],
-            )
-            selected_graph_dim = st.selectbox(
-                "Visual Graf 5 Dimensi",
-                options=[IKR_OVERALL_METRIC] + list(IKR_DIMENSION_MAP),
-                format_func=lambda x: f"{x[0]} ({x[1]})",
-            )
-            graph_spatial_mode = st.selectbox(
-                "Mode Visualisasi Graf",
-                options=["Layout Jaringan", "Spasial OSM", "Spasial ArcGIS"],
-                index=0,
-                help="Jika memilih mode spasial, node ditampilkan di peta berdasarkan lat/lon tanpa edge.",
-            )
-            selected_centrality_key = st.selectbox(
-                "Analisis Centrality (Graf Louvain)",
-                options=[
-                    ("Tidak aktif", "none"),
-                    ("Degree Centrality", "degree"),
-                    ("Betweenness Centrality", "betweenness"),
-                    ("Closeness Centrality", "closeness"),
-                    ("Eigenvector Centrality", "eigenvector"),
-                ],
-                format_func=lambda x: x[0],
-                index=0,
-            )[1]
-            if selected_centrality_key != "none":
-                st.caption(centrality_help_text(selected_centrality_key))
+            if page_mode == "Analisis Centrality":
+                layout_spread = st.slider(
+                    "Sebaran Layout Jaringan",
+                    min_value=1.0,
+                    max_value=3.4,
+                    value=2.2,
+                    step=0.1,
+                    help="Semakin besar nilai ini, jarak visual antarklaster makin renggang.",
+                )
+                graph_spatial_mode = "Layout Jaringan"
+                selected_centrality_key = st.selectbox(
+                    "Metrik Centrality",
+                    options=[
+                        ("Degree Centrality", "degree"),
+                        ("Betweenness Centrality", "betweenness"),
+                        ("Closeness Centrality", "closeness"),
+                        ("Eigenvector Centrality", "eigenvector"),
+                    ],
+                    format_func=lambda x: x[0],
+                    index=0,
+                )[1]
+            elif page_mode == "Dashboard Audit":
+                layout_spread = st.slider(
+                    "Sebaran Layout Jaringan",
+                    min_value=1.0,
+                    max_value=3.4,
+                    value=2.2,
+                    step=0.1,
+                    help="Semakin besar nilai ini, jarak visual antarklaster makin renggang.",
+                )
+                selected_dim_key = st.selectbox(
+                    "Drill-Down Dimensi",
+                    options=list(DRILLDOWN_DIMENSIONS.keys()),
+                    format_func=lambda k: DRILLDOWN_DIMENSIONS[k]["label"],
+                )
+                selected_graph_dim = st.selectbox(
+                    "Visual Jaringan Dimensi Kesejahteraan",
+                    options=[IKR_OVERALL_METRIC] + list(IKR_DIMENSION_MAP),
+                    format_func=lambda x: f"{x[0]} ({x[1]})",
+                )
+                graph_spatial_mode = st.selectbox(
+                    "Mode Visualisasi Jaringan",
+                    options=["Layout Jaringan", "Spasial OSM", "Spasial ArcGIS"],
+                    index=0,
+                    help="Jika memilih mode spasial, node ditampilkan di peta berdasarkan lat/lon tanpa edge.",
+                )
+                selected_centrality_key = "none"
+                st.caption("Analisis centrality dipisahkan ke halaman khusus: Analisis Centrality.")
         elif page_mode == "Analisis Bansos Spasial":
             basis_col = st.selectbox("Basis Jaringan", available_basis, format_func=lambda x: x[0])[1]
             weighting_mode = st.selectbox(
@@ -3556,7 +4961,7 @@ if uploaded_file:
             )
             bansos_map_color_mode = st.selectbox(
                 "Warna Node Peta",
-                options=["F_IKR Agregat", "Status Bansos (YA/TIDAK)", "Status BPS-Bansos"],
+                options=["IKR Agregat", "Status Bansos (YA/TIDAK)", "Status BPS-Bansos"],
                 index=0,
             )
             bansos_filter_mode = st.selectbox(
@@ -3680,6 +5085,7 @@ if uploaded_file:
         df_v,
         basis_col,
         threshold_val,
+        auto_threshold=auto_threshold_mode,
         lcc_only=lcc_only,
         similarity_method=weighting_mode,
         force_louvain_lcc=lcc_only,
@@ -3702,18 +5108,17 @@ if uploaded_file:
                 dim_thresholds=bansos_dim_thresholds,
             )
             st.stop()
-        st.markdown(f"<h1 class='main-header'>Dashboard Master SNA Audit: {selected_desa}</h1>", unsafe_allow_html=True)
         method_used = meta.get("similarity_method")
         threshold_used = float(meta.get("threshold_selected", threshold_val))
         if method_used == "cosine":
             method_label = "Cosine Similarity"
-            kernel_info = "Vektor one-hot dari F_A..F_E_dari_rekap_kk"
+            kernel_info = "Vektor one-hot dari lima dimensi kesejahteraan"
         elif method_used == "jaccard":
             method_label = "Jaccard Index"
-            kernel_info = "Irisan/union fitur aktif dari vektor one-hot F_A..F_E_dari_rekap_kk"
+            kernel_info = "Irisan/union fitur aktif dari vektor one-hot lima dimensi kesejahteraan"
         elif method_used == "pearson":
             method_label = "Pearson Correlation"
-            kernel_info = "Korelasi antar vektor one-hot F_A..F_E_dari_rekap_kk"
+            kernel_info = "Korelasi antar vektor one-hot lima dimensi kesejahteraan"
         else:
             method_label = str(method_used).upper() if method_used else "-"
             kernel_info = "Metode custom"
@@ -3722,6 +5127,33 @@ if uploaded_file:
             if int(meta.get("onehot_round_decimals", 2)) == 0
             else f"{int(meta.get('onehot_round_decimals', 2))} desimal"
         )
+        if page_mode == "Rangkuman Threshold Otomatis":
+            st.markdown(f"<h1 class='main-header'>Rangkuman Threshold Otomatis: {selected_desa}</h1>", unsafe_allow_html=True)
+            render_auto_threshold_summary(
+                meta=meta,
+                graph_obj=G,
+                partition=partition,
+                selected_desa=selected_desa,
+                basis_col=basis_col,
+                method_label=method_label,
+                kernel_info=kernel_info,
+                rounding_label=rounding_label,
+                compact=False,
+            )
+            st.stop()
+        if page_mode == "Analisis Centrality":
+            render_centrality_analysis_page(
+                graph_obj=G,
+                partition=partition,
+                df_v=df_v,
+                selected_desa=selected_desa,
+                selected_centrality_key=selected_centrality_key,
+                col_spasial=col_spasial,
+                layout_spread=layout_spread,
+            )
+            st.stop()
+
+        st.markdown(f"<h1 class='main-header'>Dashboard Master SNA Audit: {selected_desa}</h1>", unsafe_allow_html=True)
         st.markdown(
             f"<div class='premium-hero'><b>Ringkasan Konfigurasi</b><br>"
             f"Basis: <b>{basis_col}</b> | Threshold Kemiripan Terpilih: <b>{threshold_used:.0%} ({threshold_used:.2f})</b> | "
@@ -3793,7 +5225,10 @@ if uploaded_file:
                         df_thr.style.apply(_highlight_selected_threshold, axis=1),
                         use_container_width=True,
                     )
-        with subbab_dropdown("Fokus Skema Baru: Graf Base -> Louvain -> Graf Hasil", expanded=True):
+                df_sens_dashboard = get_threshold_sensitivity_dataframe(meta)
+                if not df_sens_dashboard.empty:
+                    render_threshold_sensitivity_heatmap(df_sens_dashboard)
+        with subbab_dropdown("Alur Jaringan: Pembentukan Base Graph, Louvain, dan Audit", expanded=True):
             c_base = st.columns(4)
             with c_base[0]:
                 st.metric("Node", G.number_of_nodes())
@@ -3814,24 +5249,31 @@ if uploaded_file:
                 st.metric("Threshold Terpilih", f"{threshold_used:.2f}")
 
             n_nodes_layout = max(G.number_of_nodes(), 2)
-            # K lebih besar + spread terkontrol agar node tidak saling menumpuk.
-            layout_k_base = 2.8 / np.sqrt(n_nodes_layout)
-            layout_k = float(np.clip(layout_k_base * layout_spread, 0.22, 1.35))
-            layout_iter = int(np.clip(180 + (layout_spread * 120), 180, 520))
-            pos_focus = nx.spring_layout(
+            pos_focus = build_clustered_network_layout(
                 G,
+                partition=partition,
+                layout_spread=layout_spread,
                 seed=42,
-                weight="weight",
-                k=layout_k,
-                iterations=layout_iter,
             )
             edge_weights = [_safe_float_metric(d.get("weight"), default=0.0) for _, _, d in G.edges(data=True)]
             edge_min = float(min(edge_weights)) if edge_weights else 0.0
             edge_max = float(max(edge_weights)) if edge_weights else 1.0
             edge_span = max(edge_max - edge_min, 1e-9)
+            visible_edge_limit = int(np.clip(n_nodes_layout * 1.45, 180, 950))
+            visible_edges_focus = select_representative_edges(
+                G,
+                max_edges=visible_edge_limit,
+                per_node=1,
+            )
+            node_size_main = network_marker_size(n_nodes_layout, base=9.0)
+            node_line_width = 0.42 if n_nodes_layout >= 300 else 0.6
             cluster_ids_sorted = sorted(set(partition.values()))
-            # Gunakan palet diskret kontras tinggi agar setiap klaster terpisah jelas secara visual.
-            cluster_palette_base = px.colors.qualitative.Dark24 + px.colors.qualitative.Alphabet
+            # Palet diskret yang ramah cetak dan tetap kontras untuk publikasi akademik.
+            cluster_palette_base = [
+                "#0072B2", "#D55E00", "#009E73", "#CC79A7", "#56B4E9", "#E69F00",
+                "#332288", "#88CCEE", "#44AA99", "#117733", "#999933", "#882255",
+                "#AA4499", "#DDCC77", "#CC6677", "#6699CC", "#661100", "#999999",
+            ] + px.colors.qualitative.Dark24 + px.colors.qualitative.Alphabet
             cluster_palette = cluster_palette_base[:len(cluster_ids_sorted)]
             cid_to_idx = {cid: idx for idx, cid in enumerate(cluster_ids_sorted)}
 
@@ -3850,6 +5292,21 @@ if uploaded_file:
 
             cluster_colorscale = build_discrete_colorscale(cluster_palette)
             node_ids = list(G.nodes())
+            cluster_color_map = {cid: cluster_palette[cid_to_idx.get(cid, 0)] for cid in cluster_ids_sorted}
+            edge_weight_palette = ["#B91C1C", "#D97706", "#0F766E", "#2563EB"]
+
+            def edge_color_by_weight(_u, _v, _d=None, w_norm=0.0):
+                color_idx = int(np.clip(np.floor(float(w_norm) * len(edge_weight_palette)), 0, len(edge_weight_palette) - 1))
+                return rgba_from_hex(edge_weight_palette[color_idx], 0.36)
+
+            def edge_color_by_interaction(u, v, _d=None, _w_norm=0.0):
+                cu = partition.get(u, -1)
+                cv = partition.get(v, -1)
+                if cu == cv:
+                    return rgba_from_hex(cluster_color_map.get(cu, "#64748b"), 0.46)
+                iu, iv = sorted([cid_to_idx.get(cu, 0), cid_to_idx.get(cv, 0)])
+                pair_idx = ((iu + 1) * 7 + (iv + 1) * 13) % len(CONTRAST_COLORS)
+                return rgba_from_hex(CONTRAST_COLORS[pair_idx], 0.34)
 
             def node_meta(nid):
                 n_attr = G.nodes[nid]
@@ -3863,51 +5320,43 @@ if uploaded_file:
             node_customdata = [node_meta(n) for n in node_ids]
 
             fig_base = go.Figure()
-            for u, v, d in G.edges(data=True):
-                w = _safe_float_metric(d.get("weight"), default=0.0)
-                w_norm = float((w - edge_min) / edge_span)
-                width_w = 1.0 + (2.2 * w_norm)
-                cu = partition.get(u, -1)
-                cv = partition.get(v, -1)
-                edge_color = "rgba(100,116,139,0.55)"
-                fig_base.add_trace(
-                    go.Scatter(
-                        x=[pos_focus[u][0], pos_focus[v][0], None],
-                        y=[pos_focus[u][1], pos_focus[v][1], None],
-                        mode="lines",
-                        line=dict(width=width_w, color=edge_color),
-                        hovertemplate=f"Interaksi: {w:.4f}<br>Klaster Edge: {cu} - {cv}<extra></extra>",
-                        showlegend=False,
-                    )
-                )
+            add_network_edge_traces(
+                fig_base,
+                visible_edges_focus,
+                pos_focus,
+                edge_min,
+                edge_span,
+                color_fn=edge_color_by_weight,
+                base_width=0.28,
+                width_scale=0.82,
+                hover=True,
+            )
             fig_base.add_trace(
                 go.Scatter(
                     x=[pos_focus[n][0] for n in node_ids],
                     y=[pos_focus[n][1] for n in node_ids],
                     mode="markers",
                     marker=dict(
-                        size=10,
+                        size=node_size_main,
                         color="#0ea5e9",
-                        line=dict(color="#0f172a", width=0.6),
+                        opacity=0.86,
+                        line=dict(color=NETWORK_NODE_LINE, width=node_line_width),
                     ),
                     customdata=node_customdata,
                     hovertemplate=(
                         "Nama: %{customdata[0]}<br>"
                         "Usia: %{customdata[1]}<br>"
                         "Profesi: %{customdata[2]}<br>"
-                        "F_IKR: %{customdata[3]}<br>"
+                        "IKR Agregat: %{customdata[3]}<br>"
                         "Klaster: %{customdata[4]}<extra></extra>"
                     ),
                     name="Node KK",
                 )
             )
-            fig_base.update_layout(
-                title="Graf Base (sebelum audit lanjutan)",
-                height=520,
-                template="plotly_white",
-                margin=dict(l=20, r=20, t=60, b=20),
-                xaxis=dict(visible=False),
-                yaxis=dict(visible=False),
+            style_network_figure(
+                fig_base,
+                title="Jaringan Kemiripan Rumah Tangga Sebelum Deteksi Komunitas",
+                height=650,
             )
             if graph_spatial_mode == "Layout Jaringan":
                 st.plotly_chart(fig_base, use_container_width=True, config=PLOTLY_DRAW_CONFIG)
@@ -3915,7 +5364,7 @@ if uploaded_file:
                 base_hover = [
                     (
                         f"Nama: {cd[0]}<br>Usia: {cd[1]}<br>Profesi: {cd[2]}"
-                        f"<br>F_IKR: {cd[3]}<br>Klaster: {cd[4]}"
+                        f"<br>IKR Agregat: {cd[3]}<br>Klaster: {cd[4]}"
                     )
                     for cd in node_customdata
                 ]
@@ -3924,7 +5373,7 @@ if uploaded_file:
                     node_ids=node_ids,
                     node_color_vals=[0.0 for _ in node_ids],
                     node_hover_text=base_hover,
-                    title="Graf Base (Sebaran Spasial Node)",
+                    title="Sebaran Spasial Node pada Jaringan Kemiripan",
                     spatial_mode=graph_spatial_mode,
                     marker_size=10,
                     colorscale=[[0.0, "#0ea5e9"], [1.0, "#0ea5e9"]],
@@ -3938,41 +5387,31 @@ if uploaded_file:
                     st.warning("Mode spasial aktif, tetapi kolom lat/lon belum valid. Ditampilkan mode layout jaringan.")
                     st.plotly_chart(fig_base, use_container_width=True, config=PLOTLY_DRAW_CONFIG)
 
-            cluster_color_map = {cid: cluster_palette[cid_to_idx.get(cid, 0)] for cid in cluster_ids_sorted}
-            def edge_color_by_interaction(u, v):
-                cu = partition.get(u, -1)
-                cv = partition.get(v, -1)
-                return cluster_color_map.get(cu, "#64748b") if cu == cv else "rgba(148,163,184,0.45)"
             fig_louvain_focus = go.Figure()
-            for u, v, d in G.edges(data=True):
-                w = _safe_float_metric(d.get("weight"), default=0.0)
-                w_norm = float((w - edge_min) / edge_span)
-                width_w = 1.0 + (2.2 * w_norm)
-                cu = partition.get(u, -1)
-                cv = partition.get(v, -1)
-                edge_color = edge_color_by_interaction(u, v)
-                fig_louvain_focus.add_trace(
-                    go.Scatter(
-                        x=[pos_focus[u][0], pos_focus[v][0], None],
-                        y=[pos_focus[u][1], pos_focus[v][1], None],
-                        mode="lines",
-                        line=dict(width=width_w, color=edge_color),
-                        hovertemplate=f"Interaksi: {w:.4f}<br>Klaster Edge: {cu} - {cv}<extra></extra>",
-                        showlegend=False,
-                    )
-                )
+            add_network_edge_traces(
+                fig_louvain_focus,
+                visible_edges_focus,
+                pos_focus,
+                edge_min,
+                edge_span,
+                color_fn=edge_color_by_interaction,
+                base_width=0.3,
+                width_scale=0.95,
+                hover=True,
+            )
             fig_louvain_focus.add_trace(
                 go.Scatter(
                     x=[pos_focus[n][0] for n in node_ids],
                     y=[pos_focus[n][1] for n in node_ids],
                     mode="markers",
                     marker=dict(
-                        size=12,
+                        size=node_size_main + 0.8,
                         color=[cid_to_idx.get(partition.get(n, -1), 0) for n in node_ids],
                         colorscale=cluster_colorscale,
                         cmin=-0.5,
                         cmax=max(len(cluster_ids_sorted) - 0.5, 0.5),
-                        line=dict(color="#0f172a", width=0.6),
+                        opacity=0.9,
+                        line=dict(color=NETWORK_NODE_LINE, width=node_line_width),
                         showscale=True,
                         colorbar=dict(
                             title="Klaster Louvain",
@@ -3986,19 +5425,16 @@ if uploaded_file:
                         "Nama: %{customdata[0]}<br>"
                         "Usia: %{customdata[1]}<br>"
                         "Profesi: %{customdata[2]}<br>"
-                        "F_IKR: %{customdata[3]}<br>"
+                        "IKR Agregat: %{customdata[3]}<br>"
                         "Klaster: %{customdata[4]}<extra></extra>"
                     ),
                     name="Node KK",
                 )
             )
-            fig_louvain_focus.update_layout(
-                title="Graf Hasil Louvain",
-                height=560,
-                template="plotly_white",
-                margin=dict(l=20, r=20, t=60, b=20),
-                xaxis=dict(visible=False),
-                yaxis=dict(visible=False),
+            style_network_figure(
+                fig_louvain_focus,
+                title="Jaringan Komunitas Louvain Berdasarkan Kemiripan Dimensi Kesejahteraan",
+                height=670,
             )
             if graph_spatial_mode == "Layout Jaringan":
                 st.plotly_chart(fig_louvain_focus, use_container_width=True, config=PLOTLY_DRAW_CONFIG)
@@ -4006,7 +5442,7 @@ if uploaded_file:
                 louvain_hover = [
                     (
                         f"Nama: {cd[0]}<br>Usia: {cd[1]}<br>Profesi: {cd[2]}"
-                        f"<br>F_IKR: {cd[3]}<br>Klaster: {cd[4]}"
+                        f"<br>IKR Agregat: {cd[3]}<br>Klaster: {cd[4]}"
                     )
                     for cd in node_customdata
                 ]
@@ -4016,7 +5452,7 @@ if uploaded_file:
                     node_ids=node_ids,
                     node_color_vals=louvain_color_vals,
                     node_hover_text=louvain_hover,
-                    title="Graf Hasil Louvain (Sebaran Spasial Node)",
+                    title="Sebaran Spasial Komunitas Louvain",
                     spatial_mode=graph_spatial_mode,
                     marker_size=12,
                     colorscale=cluster_colorscale,
@@ -4035,18 +5471,200 @@ if uploaded_file:
                     st.warning("Mode spasial aktif, tetapi kolom lat/lon belum valid. Ditampilkan mode layout jaringan.")
                     st.plotly_chart(fig_louvain_focus, use_container_width=True, config=PLOTLY_DRAW_CONFIG)
 
+        with subbab_dropdown("Proporsi Klaster Louvain per Dusun", expanded=True):
+            dusun_attr_cluster = "dusun" if "dusun" in df_v.columns else col_spasial
+            df_dusun_cluster, df_dusun_cluster_wide, df_cluster_overall = build_dusun_cluster_composition(
+                G,
+                dusun_attr=dusun_attr_cluster,
+                partition=partition,
+            )
+            if df_dusun_cluster.empty:
+                st.info("Komposisi klaster per dusun belum dapat dihitung karena atribut dusun atau node graf belum tersedia.")
+            else:
+                st.caption(
+                    "Proporsi dihitung dari KK yang masuk graf aktif. Persentase pada diagram dusun dibaca terhadap total KK di dusun masing-masing."
+                )
+                dominant_cluster_row = df_cluster_overall.sort_values("Jumlah KK", ascending=False).iloc[0]
+                m_prop1, m_prop2, m_prop3, m_prop4 = st.columns(4)
+                m_prop1.metric("KK Terpetakan", f"{int(df_cluster_overall['Jumlah KK'].sum())}")
+                m_prop2.metric("Jumlah Klaster", f"{int(df_cluster_overall['Klaster Louvain'].nunique())}")
+                m_prop3.metric("Jumlah Dusun", f"{int(df_dusun_cluster['Dusun'].nunique())}")
+                m_prop4.metric(
+                    "Klaster Dominan",
+                    dominant_cluster_row["Klaster Louvain"],
+                    f"{float(dominant_cluster_row['Persentase KK (%)']):.1f}%",
+                )
+
+                cluster_label_order = df_cluster_overall["Klaster Louvain"].tolist()
+                cluster_label_color_map = {}
+                for _, row_cluster in df_cluster_overall.iterrows():
+                    cid = int(row_cluster["ID Klaster Internal"])
+                    label = row_cluster["Klaster Louvain"]
+                    cluster_label_color_map[label] = (
+                        "#94A3B8"
+                        if cid < 0
+                        else cluster_color_map.get(cid, cluster_palette[cid_to_idx.get(cid, 0) % len(cluster_palette)])
+                    )
+
+                plot_prop_1, plot_prop_2 = st.columns([0.9, 1.35])
+                with plot_prop_1:
+                    fig_cluster_overall = px.bar(
+                        df_cluster_overall,
+                        x="Klaster Louvain",
+                        y="Persentase KK (%)",
+                        color="Klaster Louvain",
+                        color_discrete_map=cluster_label_color_map,
+                        text="Label Batang",
+                        hover_data={
+                            "Jumlah KK": True,
+                            "Persentase KK (%)": ":.2f",
+                            "ID Klaster Internal": True,
+                            "Klaster Louvain": False,
+                        },
+                        category_orders={"Klaster Louvain": cluster_label_order},
+                    )
+                    fig_cluster_overall.update_traces(
+                        textposition="outside",
+                        cliponaxis=False,
+                        marker_line_color="#111827",
+                        marker_line_width=0.5,
+                    )
+                    style_publication_figure(
+                        fig_cluster_overall,
+                        title="Proporsi KK Menurut Klaster",
+                        height=430,
+                        xaxis_title="",
+                        yaxis_title="Persentase KK (%)",
+                        showlegend=False,
+                    )
+                    fig_cluster_overall.update_yaxes(range=[0, 100], ticksuffix="%")
+                    st.plotly_chart(fig_cluster_overall, use_container_width=True, config=PLOTLY_DRAW_CONFIG)
+
+                with plot_prop_2:
+                    dusun_order_for_plot = (
+                        df_dusun_cluster.groupby("Dusun")["Total KK Dusun"]
+                        .max()
+                        .sort_values(ascending=True)
+                        .index
+                        .tolist()
+                    )
+                    fig_dusun_cluster = px.bar(
+                        df_dusun_cluster,
+                        x="Persentase dalam Dusun (%)",
+                        y="Dusun",
+                        color="Klaster Louvain",
+                        orientation="h",
+                        barmode="stack",
+                        text="Label Persen",
+                        color_discrete_map=cluster_label_color_map,
+                        category_orders={
+                            "Dusun": dusun_order_for_plot,
+                            "Klaster Louvain": cluster_label_order,
+                        },
+                        hover_data={
+                            "Jumlah KK": True,
+                            "Total KK Dusun": True,
+                            "Persentase dalam Dusun (%)": ":.2f",
+                            "Persentase dari Total Graf (%)": ":.2f",
+                            "ID Klaster Internal": True,
+                        },
+                    )
+                    fig_dusun_cluster.update_traces(
+                        textposition="inside",
+                        insidetextanchor="middle",
+                        marker_line_color="#FFFFFF",
+                        marker_line_width=0.6,
+                    )
+                    style_publication_figure(
+                        fig_dusun_cluster,
+                        title=f"Proporsi Klaster dalam Setiap {dusun_attr_cluster.title()}",
+                        height=max(430, min(820, 230 + (28 * len(dusun_order_for_plot)))),
+                        xaxis_title="Proporsi dalam dusun (%)",
+                        yaxis_title="",
+                        legend_title="Klaster",
+                    )
+                    fig_dusun_cluster.update_xaxes(range=[0, 100], ticksuffix="%")
+                    st.plotly_chart(fig_dusun_cluster, use_container_width=True, config=PLOTLY_DRAW_CONFIG)
+
+                pct_cols = [c for c in df_dusun_cluster_wide.columns if c.endswith("Persentase (%)")]
+                fmt_cols = {c: "{:.1f}" for c in pct_cols}
+                count_cols = [c for c in df_dusun_cluster_wide.columns if c.endswith("Jumlah KK") or c == "Total KK Dusun"]
+                fmt_cols.update({c: "{:,.0f}" for c in count_cols})
+                st.markdown("##### Tabel Proporsi Klaster per Dusun")
+                tab_prop_wide, tab_prop_long = st.tabs(["Ringkas per Dusun", "Detail Dusun-Klaster"])
+                with tab_prop_wide:
+                    st.dataframe(
+                        df_dusun_cluster_wide.style.format(fmt_cols).background_gradient(cmap="YlGnBu", subset=pct_cols),
+                        use_container_width=True,
+                    )
+                with tab_prop_long:
+                    detail_cols = [
+                        "Dusun",
+                        "Klaster Louvain",
+                        "ID Klaster Internal",
+                        "Jumlah KK",
+                        "Total KK Dusun",
+                        "Persentase dalam Dusun (%)",
+                        "Persentase dari Total Graf (%)",
+                        "Persentase dari Klaster (%)",
+                    ]
+                    st.dataframe(
+                        df_dusun_cluster[detail_cols].style.format(
+                            {
+                                "Jumlah KK": "{:,.0f}",
+                                "Total KK Dusun": "{:,.0f}",
+                                "Persentase dalam Dusun (%)": "{:.2f}",
+                                "Persentase dari Total Graf (%)": "{:.2f}",
+                                "Persentase dari Klaster (%)": "{:.2f}",
+                            }
+                        ).background_gradient(cmap="YlGnBu", subset=["Persentase dalam Dusun (%)"]),
+                        use_container_width=True,
+                    )
+
         if selected_centrality_key != "none":
-            centrality_vals = compute_centrality_on_similarity_graph(G, selected_centrality_key)
             centrality_name = {
                 "degree": "Degree Centrality",
                 "betweenness": "Betweenness Centrality",
                 "closeness": "Closeness Centrality",
                 "eigenvector": "Eigenvector Centrality",
             }.get(selected_centrality_key, "Centrality")
+            all_centrality_specs = [
+                ("Degree Centrality", "degree"),
+                ("Betweenness Centrality", "betweenness"),
+                ("Closeness Centrality", "closeness"),
+                ("Eigenvector Centrality", "eigenvector"),
+            ]
+            centrality_metric_values = {
+                metric_label: compute_centrality_on_similarity_graph(G, metric_key)
+                for metric_label, metric_key in all_centrality_specs
+            }
+            centrality_vals = centrality_metric_values.get(centrality_name, {})
             if centrality_vals:
-                st.markdown(f"### Analisis {centrality_name} (Graf Hasil Louvain)")
+                st.markdown(f"### Analisis {centrality_name} pada Jaringan Louvain")
                 st.caption(centrality_help_text(selected_centrality_key))
+                publish_mode = st.toggle(
+                    "Mode publikasi / anonimisasi",
+                    value=True,
+                    key=f"centrality_publish_mode_{selected_centrality_key}",
+                    help="Jika aktif, nama, family_id, dusun asli, dan koordinat presisi tidak ditampilkan pada bagian centrality.",
+                )
+                highlight_roles = st.toggle(
+                    "Highlight Peran Struktural",
+                    value=False,
+                    key=f"centrality_highlight_roles_{selected_centrality_key}",
+                    help="Tampilkan visual tambahan yang mewarnai node berdasarkan peran struktural kebijakan.",
+                )
+                if publish_mode and graph_spatial_mode != "Layout Jaringan":
+                    st.info("Mode publikasi aktif: visual centrality memakai layout jaringan agar koordinat rumah tangga tidak diekspos.")
                 dusun_attr_centrality = "dusun" if "dusun" in df_v.columns else col_spasial
+                anon_node_map = make_anonymized_node_mapping(node_ids)
+                dusun_values_all = sorted(
+                    {
+                        str(G.nodes[n].get(dusun_attr_centrality, "Tidak tersedia"))
+                        for n in node_ids
+                    }
+                )
+                dusun_code_map = {val: f"Dusun-{idx + 1}" for idx, val in enumerate(dusun_values_all)}
                 node_centrality_rows = []
                 for n in node_ids:
                     n_attr = G.nodes[n]
@@ -4058,33 +5676,77 @@ if uploaded_file:
                     row = {
                         "family_id": n,
                         "Nama": n_attr.get("nama", "-"),
+                        "Kode Node": anon_node_map.get(str(n), "N-000"),
                         "Klaster Louvain": int(partition.get(n, -1)),
                         "Dusun": n_attr.get(dusun_attr_centrality, "-"),
+                        "Dusun/Kode Dusun": (
+                            dusun_code_map.get(str(n_attr.get(dusun_attr_centrality, "Tidak tersedia")), "Dusun-0")
+                            if publish_mode
+                            else str(n_attr.get(dusun_attr_centrality, "-"))
+                        ),
                         "Profesi/Pekerjaan": str(profesi_raw).strip() if pd.notnull(profesi_raw) else "Tidak diketahui",
                         "Status Bansos": bansos_status,
-                        "F_IKR": _safe_float_metric(n_attr.get("f_ikr_dari_rekap_kk"), default=np.nan),
-                        centrality_name: float(centrality_vals.get(n, 0.0)),
+                        "IKR Agregat": _safe_float_metric(n_attr.get("f_ikr_dari_rekap_kk"), default=np.nan),
+                        "internet_num": n_attr.get("internet_num", n_attr.get("digital_num", np.nan)),
+                        "ponsel_num": n_attr.get("ponsel_num", np.nan),
                     }
-                    row["Status BPS"] = n_attr.get("kategori_ikr", categorize_ikr_bps(row["F_IKR"])[0])
+                    for metric_label, _ in all_centrality_specs:
+                        row[metric_label] = float(centrality_metric_values.get(metric_label, {}).get(n, 0.0))
+                    row["Status BPS"] = n_attr.get("kategori_ikr", categorize_ikr_bps(row["IKR Agregat"])[0])
                     for dim_label, dim_col in IKR_DIMENSION_MAP:
                         row[dim_label] = _safe_float_metric(n_attr.get(dim_col), default=np.nan)
                     node_centrality_rows.append(row)
                 df_centrality = pd.DataFrame(node_centrality_rows).sort_values(centrality_name, ascending=False).reset_index(drop=True)
+                c_series_full = pd.to_numeric(df_centrality[centrality_name], errors="coerce").fillna(0.0)
+                b_series_full = pd.to_numeric(df_centrality["Betweenness Centrality"], errors="coerce").fillna(0.0)
+                c_q25 = float(c_series_full.quantile(0.25)) if not c_series_full.empty else 0.0
+                c_q75 = float(c_series_full.quantile(0.75)) if not c_series_full.empty else 0.0
+                b_q75 = float(b_series_full.quantile(0.75)) if not b_series_full.empty else 0.0
+                df_centrality["_centrality_q25"] = c_q25
+                df_centrality["_centrality_q75"] = c_q75
+                df_centrality["_betweenness_q75"] = b_q75
+                df_centrality["Level Centrality"] = df_centrality[centrality_name].map(
+                    lambda v: centrality_level_from_quantile(v, c_q25, c_q75)
+                )
+                df_centrality["Level IKR"] = df_centrality.apply(
+                    lambda r: ikr_level_from_value(r.get("IKR Agregat"), r.get("Status BPS")),
+                    axis=1,
+                )
+                df_centrality["Akses Informasi"] = df_centrality.apply(access_info_label, axis=1)
+                df_centrality["Peran Struktural"] = df_centrality.apply(
+                    lambda r: classify_centrality_policy_role(
+                        r,
+                        centrality_col=centrality_name,
+                        betweenness_col="Betweenness Centrality",
+                    ),
+                    axis=1,
+                )
+                df_centrality["Implikasi Program"] = df_centrality["Peran Struktural"].map(centrality_role_implication)
+                df_centrality["Catatan Etika"] = df_centrality["Peran Struktural"].map(centrality_role_ethics_note)
+                df_centrality["Centrality terpilih"] = df_centrality[centrality_name]
+                df_centrality["Hover Aman"] = df_centrality.apply(lambda r: safe_hover_text(r, publish_mode=publish_mode), axis=1)
 
                 dim_labels = [d[0] for d in IKR_DIMENSION_MAP]
-                display_cols = [
+                display_identity_cols = ["Kode Node", "Klaster Louvain", "Dusun/Kode Dusun"] if publish_mode else [
+                    "Kode Node",
                     "Nama",
+                    "family_id",
                     "Klaster Louvain",
                     "Dusun",
+                ]
+                display_cols = [
+                    *display_identity_cols,
                     *dim_labels,
-                    "F_IKR",
+                    "IKR Agregat",
                     "Status BPS",
                     "Profesi/Pekerjaan",
                     "Status Bansos",
+                    "Akses Informasi",
+                    "Peran Struktural",
                     centrality_name,
                 ]
 
-                st.markdown("#### Filter Visual Graf Centrality")
+                st.markdown("#### Filter Visual Jaringan Centrality")
                 cluster_opts_all = sorted(df_centrality["Klaster Louvain"].dropna().unique().tolist())
                 dusun_opts_all = sorted(df_centrality["Dusun"].fillna("Tidak Valid").astype(str).unique().tolist())
                 f1, f2 = st.columns(2)
@@ -4100,6 +5762,7 @@ if uploaded_file:
                         "Pilih Dusun untuk Visual",
                         options=dusun_opts_all,
                         default=dusun_opts_all,
+                        format_func=lambda x: dusun_code_map.get(str(x), str(x)) if publish_mode else str(x),
                         key=f"cent_filter_dusun_{selected_centrality_key}",
                     )
 
@@ -4112,10 +5775,44 @@ if uploaded_file:
                 else:
                     selected_node_set = set(df_centrality_view["family_id"].tolist())
                     G_view = G.subgraph(selected_node_set).copy()
-                    centrality_view_vals = compute_centrality_on_similarity_graph(G_view, selected_centrality_key)
-                    df_centrality_view[centrality_name] = df_centrality_view["family_id"].map(
-                        lambda nid: float(centrality_view_vals.get(nid, centrality_vals.get(nid, 0.0)))
+                    centrality_view_metric_values = {
+                        metric_label: compute_centrality_on_similarity_graph(G_view, metric_key)
+                        for metric_label, metric_key in all_centrality_specs
+                    }
+                    for metric_label, _ in all_centrality_specs:
+                        fallback_vals = centrality_metric_values.get(metric_label, {})
+                        view_vals = centrality_view_metric_values.get(metric_label, {})
+                        df_centrality_view[metric_label] = df_centrality_view["family_id"].map(
+                            lambda nid, vals=view_vals, fallback=fallback_vals: float(vals.get(nid, fallback.get(nid, 0.0)))
+                        )
+                    c_series_view = pd.to_numeric(df_centrality_view[centrality_name], errors="coerce").fillna(0.0)
+                    b_series_view = pd.to_numeric(df_centrality_view["Betweenness Centrality"], errors="coerce").fillna(0.0)
+                    c_q25_view = float(c_series_view.quantile(0.25)) if not c_series_view.empty else 0.0
+                    c_q75_view = float(c_series_view.quantile(0.75)) if not c_series_view.empty else 0.0
+                    b_q75_view = float(b_series_view.quantile(0.75)) if not b_series_view.empty else 0.0
+                    df_centrality_view["_centrality_q25"] = c_q25_view
+                    df_centrality_view["_centrality_q75"] = c_q75_view
+                    df_centrality_view["_betweenness_q75"] = b_q75_view
+                    df_centrality_view["Level Centrality"] = df_centrality_view[centrality_name].map(
+                        lambda v: centrality_level_from_quantile(v, c_q25_view, c_q75_view)
                     )
+                    df_centrality_view["Level IKR"] = df_centrality_view.apply(
+                        lambda r: ikr_level_from_value(r.get("IKR Agregat"), r.get("Status BPS")),
+                        axis=1,
+                    )
+                    df_centrality_view["Akses Informasi"] = df_centrality_view.apply(access_info_label, axis=1)
+                    df_centrality_view["Peran Struktural"] = df_centrality_view.apply(
+                        lambda r: classify_centrality_policy_role(
+                            r,
+                            centrality_col=centrality_name,
+                            betweenness_col="Betweenness Centrality",
+                        ),
+                        axis=1,
+                    )
+                    df_centrality_view["Implikasi Program"] = df_centrality_view["Peran Struktural"].map(centrality_role_implication)
+                    df_centrality_view["Catatan Etika"] = df_centrality_view["Peran Struktural"].map(centrality_role_ethics_note)
+                    df_centrality_view["Centrality terpilih"] = df_centrality_view[centrality_name]
+                    df_centrality_view["Hover Aman"] = df_centrality_view.apply(lambda r: safe_hover_text(r, publish_mode=publish_mode), axis=1)
                     df_centrality_view = df_centrality_view.sort_values(centrality_name, ascending=False).reset_index(drop=True)
 
                     m_cent1, m_cent2, m_cent3 = st.columns(3)
@@ -4123,44 +5820,40 @@ if uploaded_file:
                     m_cent2.metric("Edge Terpilih", f"{int(G_view.number_of_edges())}")
                     m_cent3.metric("Nilai Tertinggi", f"{float(df_centrality_view[centrality_name].max()):.6f}")
 
-                    st.markdown(f"#### Visual Graf Louvain Dinamis ({centrality_name})")
+                    st.markdown(f"#### Visual Jaringan Louvain Dinamis ({centrality_name})")
                     if G_view.number_of_nodes() >= 1:
                         fig_cent = go.Figure()
                         edge_weights_view = [_safe_float_metric(d.get("weight"), default=0.0) for _, _, d in G_view.edges(data=True)]
                         edge_min_v = float(min(edge_weights_view)) if edge_weights_view else 0.0
                         edge_max_v = float(max(edge_weights_view)) if edge_weights_view else 1.0
                         edge_span_v = max(edge_max_v - edge_min_v, 1e-9)
-                        for u, v, d in G_view.edges(data=True):
-                            w = _safe_float_metric(d.get("weight"), default=0.0)
-                            w_norm = float((w - edge_min_v) / edge_span_v)
-                            edge_color = edge_color_by_interaction(u, v)
-                            fig_cent.add_trace(
-                                go.Scatter(
-                                    x=[pos_focus[u][0], pos_focus[v][0], None],
-                                    y=[pos_focus[u][1], pos_focus[v][1], None],
-                                    mode="lines",
-                                    line=dict(width=1.0 + (2.2 * w_norm), color=edge_color),
-                                    hoverinfo="none",
-                                    showlegend=False,
-                                )
-                            )
+                        visible_edges_view = select_representative_edges(
+                            G_view,
+                            max_edges=int(np.clip(G_view.number_of_nodes() * 1.25, 120, 650)),
+                            per_node=1,
+                        )
+                        add_network_edge_traces(
+                            fig_cent,
+                            visible_edges_view,
+                            pos_focus,
+                            edge_min_v,
+                            edge_span_v,
+                            color_fn=edge_color_by_interaction,
+                            base_width=0.26,
+                            width_scale=0.78,
+                            hover=False,
+                        )
                         node_order = list(G_view.nodes())
+                        df_cent_lookup = df_centrality_view.set_index("family_id")
                         node_val_arr = np.array(
-                            [float(df_centrality_view.set_index("family_id").loc[n, centrality_name]) for n in node_order],
+                            [float(df_cent_lookup.loc[n, centrality_name]) for n in node_order],
                             dtype=float,
                         )
                         cmin_n = float(np.nanmin(node_val_arr)) if len(node_val_arr) else 0.0
                         cmax_n = float(np.nanmax(node_val_arr)) if len(node_val_arr) else 1.0
-                        denom = max(cmax_n - cmin_n, 1e-9)
-                        size_vals = [float(11.0 + 21.0 * ((v - cmin_n) / denom)) for v in node_val_arr]
+                        size_vals = centrality_marker_sizes(node_val_arr, len(node_order))
                         cent_hover_text = [
-                            (
-                                f"Nama: {G_view.nodes[n].get('nama', '-')}"
-                                f"<br>Klaster: {partition.get(n, -1)}"
-                                f"<br>Dusun: {G_view.nodes[n].get(dusun_attr_centrality, '-')}"
-                                f"<br>F_IKR: {_safe_float_metric(G_view.nodes[n].get('f_ikr_dari_rekap_kk'), default=np.nan):.3f}"
-                                f"<br>{centrality_name}: {float(df_centrality_view.set_index('family_id').loc[n, centrality_name]):.6f}"
-                            )
+                            safe_hover_text(df_cent_lookup.loc[n], publish_mode=publish_mode)
                             for n in node_order
                         ]
                         fig_cent.add_trace(
@@ -4171,27 +5864,46 @@ if uploaded_file:
                                 marker=dict(
                                     size=size_vals,
                                     color=node_val_arr.tolist(),
-                                    colorscale="Turbo",
+                                    colorscale="Viridis",
                                     showscale=True,
                                     cmin=cmin_n,
                                     cmax=cmax_n if cmax_n > cmin_n else (cmin_n + 1e-6),
                                     colorbar=dict(title=centrality_name),
-                                    line=dict(color="#0f172a", width=0.6),
+                                    opacity=0.82,
+                                    line=dict(color=NETWORK_NODE_LINE, width=0.4),
                                 ),
                                 text=cent_hover_text,
                                 hoverinfo="text",
                                 showlegend=False,
                             )
                         )
-                        fig_cent.update_layout(
-                            title=f"Graf Louvain Terfilter: ukuran & warna berdasarkan {centrality_name}",
-                            height=560,
-                            template="plotly_white",
-                            margin=dict(l=20, r=20, t=60, b=20),
-                            xaxis=dict(visible=False),
-                            yaxis=dict(visible=False),
+                        top_ring_n = int(min(14, max(5, round(len(node_order) * 0.025))))
+                        top_ring_nodes = df_centrality_view.head(top_ring_n)["family_id"].tolist()
+                        top_ring_size = {
+                            n: min(float(size_vals[idx]) + 4.0, max(size_vals) + 5.0)
+                            for idx, n in enumerate(node_order)
+                        }
+                        if top_ring_nodes:
+                            fig_cent.add_trace(
+                                go.Scatter(
+                                    x=[pos_focus[n][0] for n in top_ring_nodes if n in pos_focus],
+                                    y=[pos_focus[n][1] for n in top_ring_nodes if n in pos_focus],
+                                    mode="markers",
+                                    marker=dict(
+                                        size=[top_ring_size.get(n, 13.0) for n in top_ring_nodes if n in pos_focus],
+                                        color="rgba(255,255,255,0)",
+                                        line=dict(color="#111827", width=1.4),
+                                    ),
+                                    hoverinfo="skip",
+                                    showlegend=False,
+                                )
+                            )
+                        style_network_figure(
+                            fig_cent,
+                            title=f"Jaringan Louvain Terfilter Menurut {centrality_name}",
+                            height=690,
                         )
-                        if graph_spatial_mode == "Layout Jaringan":
+                        if graph_spatial_mode == "Layout Jaringan" or publish_mode:
                             st.plotly_chart(fig_cent, use_container_width=True, config=PLOTLY_DRAW_CONFIG)
                         else:
                             fig_cent_spatial = build_spatial_node_figure(
@@ -4199,10 +5911,10 @@ if uploaded_file:
                                 node_ids=node_order,
                                 node_color_vals=node_val_arr.tolist(),
                                 node_hover_text=cent_hover_text,
-                                title=f"Graf Louvain Spasial Terfilter ({centrality_name})",
+                                title=f"Sebaran Spasial Louvain Terfilter Menurut {centrality_name}",
                                 spatial_mode=graph_spatial_mode,
                                 marker_size=13,
-                                colorscale="Turbo",
+                                colorscale="Viridis",
                                 cmin=cmin_n,
                                 cmax=cmax_n if cmax_n > cmin_n else (cmin_n + 1e-6),
                                 colorbar=dict(title=centrality_name),
@@ -4213,9 +5925,364 @@ if uploaded_file:
                                 st.warning("Mode spasial aktif, tetapi kolom lat/lon belum valid. Ditampilkan mode layout jaringan.")
                                 st.plotly_chart(fig_cent, use_container_width=True, config=PLOTLY_DRAW_CONFIG)
 
+                    role_narrative = build_centrality_policy_narrative(df_centrality_view, centrality_name)
+                    st.markdown("#### Interpretasi Struktural dan Implikasi Program")
+                    st.info(role_narrative)
+
+                    with subbab_dropdown("Catatan Etika dan Batasan Interpretasi", expanded=publish_mode):
+                        st.markdown(
+                            """
+                            - Data mikro rumah tangga adalah data sensitif.
+                            - Identitas individu/KK perlu disamarkan dalam visualisasi publik.
+                            - Centrality tidak boleh dimaknai sebagai status sosial seseorang.
+                            - Hasil centrality tidak membuktikan inclusion error atau exclusion error.
+                            - Hasil hanya mendukung proses verifikasi, evaluasi, dan diskusi kebijakan.
+                            - Verifikasi lapangan dan persetujuan penggunaan data tetap diperlukan.
+                            - Hindari penyebutan nama orang, alamat spesifik, atau koordinat presisi pada materi presentasi/publikasi.
+                            """
+                        )
+
+                    if highlight_roles and G_view.number_of_nodes() >= 1:
+                        st.markdown("#### Network Highlight Node Strategis")
+                        fig_role = go.Figure()
+                        role_edge_weights = [_safe_float_metric(d.get("weight"), default=0.0) for _, _, d in G_view.edges(data=True)]
+                        role_edge_min = float(min(role_edge_weights)) if role_edge_weights else 0.0
+                        role_edge_max = float(max(role_edge_weights)) if role_edge_weights else 1.0
+                        role_edge_span = max(role_edge_max - role_edge_min, 1e-9)
+                        role_visible_edges = select_representative_edges(
+                            G_view,
+                            max_edges=int(np.clip(G_view.number_of_nodes() * 1.25, 120, 650)),
+                            per_node=1,
+                        )
+                        add_network_edge_traces(
+                            fig_role,
+                            role_visible_edges,
+                            pos_focus,
+                            role_edge_min,
+                            role_edge_span,
+                            color_fn=lambda *_args, **_kwargs: "rgba(148, 163, 184, 0.18)",
+                            base_width=0.22,
+                            width_scale=0.55,
+                            hover=False,
+                        )
+                        role_lookup = df_centrality_view.set_index("family_id")
+                        role_node_order = [n for n in G_view.nodes() if n in role_lookup.index and n in pos_focus]
+                        role_values = np.array([float(role_lookup.loc[n, centrality_name]) for n in role_node_order], dtype=float)
+                        role_sizes = centrality_marker_sizes(role_values, len(role_node_order))
+                        size_lookup = {n: role_sizes[idx] for idx, n in enumerate(role_node_order)}
+                        present_roles = [
+                            role for role in CENTRALITY_ROLE_ORDER
+                            if role in set(df_centrality_view["Peran Struktural"].astype(str))
+                        ]
+                        for role in present_roles:
+                            role_nodes = [
+                                n for n in role_node_order
+                                if str(role_lookup.loc[n, "Peran Struktural"]) == role
+                            ]
+                            if not role_nodes:
+                                continue
+                            is_general = role == "Node umum"
+                            fig_role.add_trace(
+                                go.Scatter(
+                                    x=[pos_focus[n][0] for n in role_nodes],
+                                    y=[pos_focus[n][1] for n in role_nodes],
+                                    mode="markers",
+                                    marker=dict(
+                                        size=[size_lookup.get(n, node_size_main) for n in role_nodes],
+                                        color=CENTRALITY_ROLE_COLORS.get(role, "#94A3B8"),
+                                        opacity=0.26 if is_general else 0.9,
+                                        line=dict(
+                                            color="rgba(71, 85, 105, 0.35)" if is_general else NETWORK_NODE_LINE,
+                                            width=0.35 if is_general else 0.85,
+                                        ),
+                                    ),
+                                    text=[safe_hover_text(role_lookup.loc[n], publish_mode=publish_mode) for n in role_nodes],
+                                    hoverinfo="text",
+                                    name=role,
+                                )
+                            )
+                        top5_role_nodes = df_centrality_view.head(5)["family_id"].tolist()
+                        top5_role_nodes = [n for n in top5_role_nodes if n in pos_focus]
+                        if top5_role_nodes:
+                            fig_role.add_trace(
+                                go.Scatter(
+                                    x=[pos_focus[n][0] for n in top5_role_nodes],
+                                    y=[pos_focus[n][1] for n in top5_role_nodes],
+                                    mode="markers",
+                                    marker=dict(
+                                        size=[size_lookup.get(n, node_size_main) + 5.0 for n in top5_role_nodes],
+                                        color="rgba(255,255,255,0)",
+                                        line=dict(color="#111827", width=1.8),
+                                    ),
+                                    hoverinfo="skip",
+                                    name="Top 5 centrality",
+                                    showlegend=True,
+                                )
+                            )
+                        style_network_figure(
+                            fig_role,
+                            title=f"Highlight Peran Struktural Berdasarkan {centrality_name}",
+                            height=690,
+                            showlegend=True,
+                        )
+                        st.plotly_chart(fig_role, use_container_width=True, config=PLOTLY_DRAW_CONFIG)
+
+                    st.markdown("#### Hubungan Centrality dengan Kesejahteraan Rumah Tangga")
+                    scatter_cols = [
+                        "Kode Node",
+                        "Klaster Louvain",
+                        "Dusun/Kode Dusun",
+                        "IKR Agregat",
+                        "Status BPS",
+                        "Status Bansos",
+                        "Akses Informasi",
+                        "Peran Struktural",
+                        "Hover Aman",
+                        centrality_name,
+                        "Degree Centrality",
+                        "Betweenness Centrality",
+                    ]
+                    if not publish_mode:
+                        scatter_cols.extend(["Nama", "family_id", "Dusun"])
+                    scatter_cols = unique_existing_columns(df_centrality_view, scatter_cols)
+                    scatter_df = df_centrality_view[scatter_cols].copy()
+                    scatter_df = scatter_df.dropna(subset=[centrality_name, "IKR Agregat"])
+                    if scatter_df.empty:
+                        st.info("Scatter centrality dan IKR belum dapat ditampilkan karena data IKR atau centrality tidak lengkap.")
+                    else:
+                        size_source = "Betweenness Centrality"
+                        if float(pd.to_numeric(scatter_df[size_source], errors="coerce").fillna(0.0).max()) <= 0:
+                            size_source = "Degree Centrality"
+                        scatter_df["Ukuran Visual"] = pd.to_numeric(scatter_df[size_source], errors="coerce").fillna(0.0)
+                        scatter_df["Ukuran Visual"] = scatter_df["Ukuran Visual"] + max(float(scatter_df["Ukuran Visual"].max()) * 0.05, 1e-6)
+                        fig_scatter = px.scatter(
+                            scatter_df,
+                            x=centrality_name,
+                            y="IKR Agregat",
+                            color="Status Bansos",
+                            size="Ukuran Visual",
+                            symbol="Peran Struktural",
+                            hover_name="Kode Node",
+                            custom_data=["Hover Aman"],
+                            title="Hubungan Centrality dengan Kesejahteraan Rumah Tangga",
+                            labels={centrality_name: centrality_name, "IKR Agregat": "IKR Agregat"},
+                            color_discrete_map={"Penerima": "#2563EB", "Tidak Menerima": "#B91C1C"},
+                            category_orders={"Peran Struktural": CENTRALITY_ROLE_ORDER},
+                        )
+                        fig_scatter.update_traces(hovertemplate="%{customdata[0]}<extra></extra>", marker=dict(line=dict(color="#111827", width=0.45)))
+                        median_centrality = float(pd.to_numeric(scatter_df[centrality_name], errors="coerce").median())
+                        ikr_cutoff = 60.0 if pd.to_numeric(scatter_df["IKR Agregat"], errors="coerce").notna().any() else float(pd.to_numeric(scatter_df["IKR Agregat"], errors="coerce").median())
+                        fig_scatter.add_vline(x=median_centrality, line_dash="dash", line_color="#111827", annotation_text="Median centrality")
+                        fig_scatter.add_hline(y=ikr_cutoff, line_dash="dash", line_color="#B91C1C", annotation_text=f"Ambang IKR {ikr_cutoff:.0f}")
+                        fig_scatter.add_annotation(x=0.77, y=0.20, xref="paper", yref="paper", text="Prioritas verifikasi", showarrow=False, font=dict(size=12, color="#92400E"))
+                        fig_scatter.add_annotation(x=0.77, y=0.83, xref="paper", yref="paper", text="Penghubung informasi", showarrow=False, font=dict(size=12, color="#1D4ED8"))
+                        fig_scatter.add_annotation(x=0.20, y=0.20, xref="paper", yref="paper", text="Rentan terisolasi", showarrow=False, font=dict(size=12, color="#B91C1C"))
+                        fig_scatter.add_annotation(x=0.24, y=0.83, xref="paper", yref="paper", text="Relatif stabil, tidak dominan jaringan", showarrow=False, font=dict(size=12, color="#475569"))
+                        style_publication_figure(
+                            fig_scatter,
+                            title="Hubungan Centrality dengan Kesejahteraan Rumah Tangga",
+                            height=560,
+                            xaxis_title=centrality_name,
+                            yaxis_title="IKR Agregat",
+                            legend_title="Status / Peran",
+                        )
+                        st.plotly_chart(fig_scatter, use_container_width=True, config=PLOTLY_DRAW_CONFIG)
+
+                    st.markdown("#### Matriks Posisi Struktural dan Kondisi Kesejahteraan")
+                    matrix_df = df_centrality_view.dropna(subset=[centrality_name, "IKR Agregat"]).copy()
+                    if matrix_df.empty:
+                        st.info("Matriks belum dapat dihitung karena data IKR atau centrality tidak lengkap.")
+                    else:
+                        matrix_df["Kelompok IKR"] = np.where(
+                            matrix_df["Level IKR"].isin(["Rendah", "Sedang"]),
+                            "IKR rendah/sedang",
+                            "IKR tinggi/sangat tinggi",
+                        )
+                        matrix_df["Kelompok Centrality"] = np.where(
+                            matrix_df["Level Centrality"].eq("Tinggi"),
+                            "Centrality tinggi",
+                            "Centrality rendah/sedang",
+                        )
+                        y_order_matrix = ["IKR rendah/sedang", "IKR tinggi/sangat tinggi"]
+                        x_order_matrix = ["Centrality rendah/sedang", "Centrality tinggi"]
+                        policy_meaning = {
+                            ("IKR rendah/sedang", "Centrality tinggi"): "Strategis untuk verifikasi/pendampingan",
+                            ("IKR rendah/sedang", "Centrality rendah/sedang"): "Rentan dan perlu pendekatan langsung",
+                            ("IKR tinggi/sangat tinggi", "Centrality tinggi"): "Penghubung informasi potensial",
+                            ("IKR tinggi/sangat tinggi", "Centrality rendah/sedang"): "Relatif stabil, bukan prioritas jaringan",
+                        }
+                        total_matrix = max(int(len(matrix_df)), 1)
+                        z_vals, text_vals, table_rows = [], [], []
+                        for y_label in y_order_matrix:
+                            z_row, text_row = [], []
+                            for x_label in x_order_matrix:
+                                count_val = int(((matrix_df["Kelompok IKR"] == y_label) & (matrix_df["Kelompok Centrality"] == x_label)).sum())
+                                pct_val = float((count_val / total_matrix) * 100.0)
+                                meaning = policy_meaning[(y_label, x_label)]
+                                z_row.append(count_val)
+                                text_row.append(f"{count_val} node<br>{pct_val:.1f}%<br>{meaning}")
+                                table_rows.append(
+                                    {
+                                        "Kelompok IKR": y_label,
+                                        "Kelompok Centrality": x_label,
+                                        "Jumlah Node": count_val,
+                                        "Persentase Node (%)": pct_val,
+                                        "Makna Kebijakan": meaning,
+                                    }
+                                )
+                            z_vals.append(z_row)
+                            text_vals.append(text_row)
+                        fig_matrix = go.Figure(
+                            go.Heatmap(
+                                z=z_vals,
+                                x=x_order_matrix,
+                                y=y_order_matrix,
+                                text=text_vals,
+                                texttemplate="%{text}",
+                                colorscale="YlGnBu",
+                                colorbar=dict(title="Jumlah node"),
+                                hovertemplate="%{y}<br>%{x}<br>%{text}<extra></extra>",
+                            )
+                        )
+                        style_publication_figure(
+                            fig_matrix,
+                            title="Matriks Posisi Struktural dan Kondisi Kesejahteraan",
+                            height=420,
+                            xaxis_title="Centrality",
+                            yaxis_title="Kondisi kesejahteraan",
+                        )
+                        st.plotly_chart(fig_matrix, use_container_width=True, config=PLOTLY_DRAW_CONFIG)
+                        st.dataframe(
+                            pd.DataFrame(table_rows).style.format({"Persentase Node (%)": "{:.2f}"}),
+                            use_container_width=True,
+                        )
+
+                    st.markdown("#### Profil Node Strategis dan Implikasi Program")
+                    top_n_profile = st.slider(
+                        "Jumlah node pada tabel profil",
+                        min_value=5,
+                        max_value=30,
+                        value=15,
+                        step=5,
+                        key=f"centrality_profile_topn_{selected_centrality_key}",
+                    )
+                    role_rank = {role: idx for idx, role in enumerate(CENTRALITY_ROLE_ORDER)}
+                    df_profile = df_centrality_view.copy()
+                    df_profile["_role_rank"] = df_profile["Peran Struktural"].map(role_rank).fillna(len(role_rank))
+                    df_profile = (
+                        df_profile.sort_values(["_role_rank", centrality_name], ascending=[True, False])
+                        .head(int(top_n_profile))
+                        .copy()
+                    )
+                    profile_cols = [
+                        "Kode Node",
+                        "Klaster Louvain",
+                        "Dusun/Kode Dusun",
+                        "Centrality terpilih",
+                        "Degree Centrality",
+                        "Betweenness Centrality",
+                        "Closeness Centrality",
+                        "Eigenvector Centrality",
+                        "IKR Agregat",
+                        "Status BPS",
+                        "Status Bansos",
+                        "Akses Informasi",
+                        "Peran Struktural",
+                        "Implikasi Program",
+                        "Catatan Etika",
+                    ]
+                    if not publish_mode:
+                        profile_cols = ["Nama", "family_id", "Dusun", *profile_cols]
+                    profile_display = df_profile[[c for c in profile_cols if c in df_profile.columns]].copy()
+                    st.dataframe(
+                        profile_display.style.format(
+                            {
+                                "Centrality terpilih": "{:.6f}",
+                                "Degree Centrality": "{:.6f}",
+                                "Betweenness Centrality": "{:.6f}",
+                                "Closeness Centrality": "{:.6f}",
+                                "Eigenvector Centrality": "{:.6f}",
+                                "IKR Agregat": "{:.3f}",
+                            }
+                        ),
+                        use_container_width=True,
+                    )
+                    anonymous_download_cols = [c for c in profile_cols if c not in {"Nama", "family_id", "Dusun"}]
+                    anonymous_source_cols = list(dict.fromkeys(["family_id", "Nama", "Dusun", *anonymous_download_cols]))
+                    anonymous_download_df = apply_privacy_view(
+                        df_profile[[c for c in anonymous_source_cols if c in df_profile.columns]],
+                        publish_mode=True,
+                    )
+                    anonymous_download_df = anonymous_download_df[
+                        [c for c in anonymous_download_cols if c in anonymous_download_df.columns]
+                    ].copy()
+                    st.download_button(
+                        "Unduh Tabel Anonim",
+                        data=anonymous_download_df.to_csv(index=False).encode("utf-8"),
+                        file_name=f"profil_node_strategis_anonim_{selected_centrality_key}.csv",
+                        mime="text/csv",
+                        key=f"download_centrality_profile_{selected_centrality_key}",
+                    )
+
+                    st.markdown("#### Komposisi Peran Struktural per Klaster dan Dusun")
+                    role_cluster_df = (
+                        df_centrality_view.groupby(["Klaster Louvain", "Peran Struktural"], as_index=False)
+                        .size()
+                        .rename(columns={"size": "Jumlah Node"})
+                    )
+                    role_dusun_col = "Dusun/Kode Dusun" if publish_mode else "Dusun"
+                    role_dusun_df = (
+                        df_centrality_view.groupby([role_dusun_col, "Peran Struktural"], as_index=False)
+                        .size()
+                        .rename(columns={"size": "Jumlah Node"})
+                    )
+                    rc1, rc2 = st.columns(2)
+                    with rc1:
+                        if not role_cluster_df.empty:
+                            fig_role_cluster = px.bar(
+                                role_cluster_df,
+                                x="Klaster Louvain",
+                                y="Jumlah Node",
+                                color="Peran Struktural",
+                                barmode="stack",
+                                title="Komposisi Peran Struktural per Klaster",
+                                color_discrete_map=CENTRALITY_ROLE_COLORS,
+                                category_orders={"Peran Struktural": CENTRALITY_ROLE_ORDER},
+                            )
+                            style_publication_figure(
+                                fig_role_cluster,
+                                title="Komposisi Peran Struktural per Klaster",
+                                height=430,
+                                xaxis_title="Klaster Louvain",
+                                yaxis_title="Jumlah node",
+                                legend_title="Peran Struktural",
+                            )
+                            st.plotly_chart(fig_role_cluster, use_container_width=True, config=PLOTLY_DRAW_CONFIG)
+                    with rc2:
+                        if not role_dusun_df.empty:
+                            fig_role_dusun = px.bar(
+                                role_dusun_df,
+                                x=role_dusun_col,
+                                y="Jumlah Node",
+                                color="Peran Struktural",
+                                barmode="stack",
+                                title="Komposisi Peran Struktural per Dusun",
+                                color_discrete_map=CENTRALITY_ROLE_COLORS,
+                                category_orders={"Peran Struktural": CENTRALITY_ROLE_ORDER},
+                            )
+                            style_publication_figure(
+                                fig_role_dusun,
+                                title="Komposisi Peran Struktural per Dusun",
+                                height=max(430, min(760, 320 + (18 * role_dusun_df[role_dusun_col].nunique()))),
+                                xaxis_title="Dusun/Kode Dusun",
+                                yaxis_title="Jumlah node",
+                                legend_title="Peran Struktural",
+                            )
+                            st.plotly_chart(fig_role_dusun, use_container_width=True, config=PLOTLY_DRAW_CONFIG)
+
                     st.markdown("#### Top 5 Centrality per Pilar (Filter Aktif)")
                     st.caption(
-                        "Tabel ini menampilkan 5 rumah tangga dengan skor tertinggi untuk setiap metrik centrality. "
+                        "Tabel ini menampilkan 5 node dengan skor tertinggi untuk setiap metrik centrality. "
                         "Gunakan ikon kamera pada kanan atas tabel untuk mengunduh PNG."
                     )
                     all_centrality_specs = [
@@ -4234,7 +6301,21 @@ if uploaded_file:
                             "scale": 2,
                         },
                     }
-                    df_centrality_all = df_centrality_view[["family_id", "Nama", "Dusun", "Profesi/Pekerjaan", "F_IKR"]].copy()
+                    df_centrality_all = df_centrality_view[
+                        [
+                            "family_id",
+                            "Kode Node",
+                            "Nama",
+                            "Dusun",
+                            "Dusun/Kode Dusun",
+                            "Profesi/Pekerjaan",
+                            "IKR Agregat",
+                            "Degree Centrality",
+                            "Betweenness Centrality",
+                            "Closeness Centrality",
+                            "Eigenvector Centrality",
+                        ]
+                    ].copy()
                     rename_metric_map = {}
                     for metric_label_all, metric_key_all in all_centrality_specs:
                         metric_vals_all = compute_centrality_on_similarity_graph(G_view, metric_key_all)
@@ -4246,9 +6327,11 @@ if uploaded_file:
                     top_tabs = st.tabs([label.replace(" Centrality", "") for label, _ in all_centrality_specs])
                     for tab_obj, (metric_label_all, _) in zip(top_tabs, all_centrality_specs):
                         score_col = rename_metric_map[metric_label_all]
+                        node_display_col = "Kode Node" if publish_mode else "Nama"
+                        dusun_display_col = "Dusun/Kode Dusun" if publish_mode else "Dusun"
                         df_top_table = (
-                            df_centrality_all[["Nama", "Dusun", "Profesi/Pekerjaan", "F_IKR", metric_label_all]]
-                            .rename(columns={"Profesi/Pekerjaan": "Pekerjaan", "F_IKR": "IKR Agregat", metric_label_all: score_col})
+                            df_centrality_all[[node_display_col, dusun_display_col, "Profesi/Pekerjaan", "IKR Agregat", metric_label_all]]
+                            .rename(columns={node_display_col: "Nama", dusun_display_col: "Dusun", "Profesi/Pekerjaan": "Pekerjaan", metric_label_all: score_col})
                             .sort_values(score_col, ascending=False)
                             .head(5)
                             .reset_index(drop=True)
@@ -4264,12 +6347,13 @@ if uploaded_file:
 
                     st.markdown(f"#### Top 10 (Filter Aktif): {centrality_name}")
                     st.dataframe(
-                        df_centrality_view[display_cols].head(10).style.format({centrality_name: "{:.6f}", "F_IKR": "{:.3f}"}),
+                        df_centrality_view[display_cols].head(10).style.format({centrality_name: "{:.6f}", "IKR Agregat": "{:.3f}"}),
                         use_container_width=True,
                     )
 
                 if not df_centrality_view.empty:
                     st.markdown("#### Analisis per Klaster dan per Dusun")
+                    centrality_dusun_summary_col = "Dusun/Kode Dusun" if publish_mode else "Dusun"
                     c_tab1, c_tab2, c_tab3, c_tab4 = st.tabs(
                         ["Ringkasan Klaster", "Top 10 per Klaster", "Ringkasan Dusun", "Top 10 per Dusun"]
                     )
@@ -4280,14 +6364,14 @@ if uploaded_file:
                                 Jumlah_Node=("family_id", "count"),
                                 Rerata_Centrality=(centrality_name, "mean"),
                                 Maks_Centrality=(centrality_name, "max"),
-                                Rerata_F_IKR=("F_IKR", "mean"),
+                                Rerata_IKR_Agregat=("IKR Agregat", "mean"),
                             )
                             .sort_values("Rerata_Centrality", ascending=False)
                             .reset_index(drop=True)
                         )
                         st.dataframe(
                             df_cluster_cent.style.format(
-                                {"Rerata_Centrality": "{:.6f}", "Maks_Centrality": "{:.6f}", "Rerata_F_IKR": "{:.3f}"}
+                                {"Rerata_Centrality": "{:.6f}", "Maks_Centrality": "{:.6f}", "Rerata_IKR_Agregat": "{:.3f}"}
                             ),
                             use_container_width=True,
                         )
@@ -4301,38 +6385,38 @@ if uploaded_file:
                         st.dataframe(
                             df_centrality_view[df_centrality_view["Klaster Louvain"] == selected_cluster_c][display_cols]
                             .head(10)
-                            .style.format({centrality_name: "{:.6f}", "F_IKR": "{:.3f}"}),
+                            .style.format({centrality_name: "{:.6f}", "IKR Agregat": "{:.3f}"}),
                             use_container_width=True,
                         )
                     with c_tab3:
                         df_dusun_cent = (
-                            df_centrality_view.groupby("Dusun", as_index=False)
+                            df_centrality_view.groupby(centrality_dusun_summary_col, as_index=False)
                             .agg(
                                 Jumlah_Node=("family_id", "count"),
                                 Rerata_Centrality=(centrality_name, "mean"),
                                 Maks_Centrality=(centrality_name, "max"),
-                                Rerata_F_IKR=("F_IKR", "mean"),
+                                Rerata_IKR_Agregat=("IKR Agregat", "mean"),
                             )
                             .sort_values("Rerata_Centrality", ascending=False)
                             .reset_index(drop=True)
                         )
                         st.dataframe(
                             df_dusun_cent.style.format(
-                                {"Rerata_Centrality": "{:.6f}", "Maks_Centrality": "{:.6f}", "Rerata_F_IKR": "{:.3f}"}
+                                {"Rerata_Centrality": "{:.6f}", "Maks_Centrality": "{:.6f}", "Rerata_IKR_Agregat": "{:.3f}"}
                             ),
                             use_container_width=True,
                         )
                     with c_tab4:
-                        dusun_opts = sorted(df_centrality_view["Dusun"].fillna("Tidak Valid").astype(str).unique().tolist())
+                        dusun_opts = sorted(df_centrality_view[centrality_dusun_summary_col].fillna("Tidak Valid").astype(str).unique().tolist())
                         selected_dusun_c = st.selectbox(
-                            "Pilih Dusun",
+                            "Pilih Dusun/Kode Dusun",
                             options=dusun_opts,
                             key=f"centrality_dusun_{selected_centrality_key}",
                         )
                         st.dataframe(
-                            df_centrality_view[df_centrality_view["Dusun"].astype(str) == str(selected_dusun_c)][display_cols]
+                            df_centrality_view[df_centrality_view[centrality_dusun_summary_col].astype(str) == str(selected_dusun_c)][display_cols]
                             .head(10)
-                            .style.format({centrality_name: "{:.6f}", "F_IKR": "{:.3f}"}),
+                            .style.format({centrality_name: "{:.6f}", "IKR Agregat": "{:.3f}"}),
                             use_container_width=True,
                         )
             else:
@@ -4365,10 +6449,10 @@ if uploaded_file:
                         "Node": int(g_c.number_of_nodes()),
                         "Edge Internal": int(g_c.number_of_edges()),
                         "Density Internal": float(nx.density(g_c)) if g_c.number_of_nodes() > 1 else 0.0,
-                        "r F_IKR": float(r_f_ikr_c),
-                        "Arah F_IKR": dir_c,
-                        "Kekuatan F_IKR": lvl_c,
-                        "r Rata-rata F_A..F_E": float(r_dim_mean_c),
+                        "r IKR Agregat": float(r_f_ikr_c),
+                        "Arah IKR Agregat": dir_c,
+                        "Kekuatan IKR Agregat": lvl_c,
+                        "r Rata-rata Lima Dimensi": float(r_dim_mean_c),
                         "r Bansos": float(r_bansos_c),
                         "r Internet": float(r_internet_c),
                         "r Ponsel": float(r_ponsel_c),
@@ -4380,8 +6464,8 @@ if uploaded_file:
                 df_cluster_assort.style.format(
                     {
                         "Density Internal": "{:.4f}",
-                        "r F_IKR": "{:.4f}",
-                        "r Rata-rata F_A..F_E": "{:.4f}",
+                        "r IKR Agregat": "{:.4f}",
+                        "r Rata-rata Lima Dimensi": "{:.4f}",
                         "r Bansos": "{:.4f}",
                         "r Internet": "{:.4f}",
                         "r Ponsel": "{:.4f}",
@@ -4393,19 +6477,19 @@ if uploaded_file:
             fig_cluster_r = px.bar(
                 df_cluster_assort,
                 x="Klaster",
-                y="r F_IKR",
-                color="r F_IKR",
+                y="r IKR Agregat",
+                color="r IKR Agregat",
                 color_continuous_scale="RdYlGn",
                 range_color=[-1, 1],
-                title="Perbandingan Assortativity F_IKR per Klaster Louvain",
-                hover_data=["Node", "Edge Internal", "Density Internal", "Arah F_IKR", "Kekuatan F_IKR"],
+                title="Perbandingan Assortativity IKR Agregat per Klaster Louvain",
+                hover_data=["Node", "Edge Internal", "Density Internal", "Arah IKR Agregat", "Kekuatan IKR Agregat"],
             )
             fig_cluster_r.add_hline(y=0.0, line_dash="dash", line_color="#475569")
-            fig_cluster_r.update_layout(template="plotly_white", xaxis_title="Klaster", yaxis_title="r F_IKR")
+            fig_cluster_r.update_layout(template="plotly_white", xaxis_title="Klaster", yaxis_title="r IKR Agregat")
             st.plotly_chart(fig_cluster_r, use_container_width=True, config=PLOTLY_DRAW_CONFIG)
             cluster_metric_long = df_cluster_assort.melt(
                 id_vars=["Klaster"],
-                value_vars=["r Rata-rata F_A..F_E", "r Bansos", "r Internet", "r Ponsel", "r Spasial"],
+                value_vars=["r Rata-rata Lima Dimensi", "r Bansos", "r Internet", "r Ponsel", "r Spasial"],
                 var_name="Metrik",
                 value_name="Nilai r",
             ).dropna(subset=["Nilai r"])
@@ -4437,7 +6521,7 @@ if uploaded_file:
                         "Klaster Louvain": int(partition.get(n, -1)),
                         "Usia": pd.to_numeric(pd.Series([usia_raw]), errors="coerce").iloc[0],
                         "Profesi/Pekerjaan": str(profesi_raw).strip() if pd.notnull(profesi_raw) else "Tidak diketahui",
-                        "F_IKR": _safe_float_metric(n_attr.get("f_ikr_dari_rekap_kk"), default=np.nan),
+                        "IKR Agregat": _safe_float_metric(n_attr.get("f_ikr_dari_rekap_kk"), default=np.nan),
                         "Weighted Degree": float(G.degree(n, weight="weight")),
                     }
                 )
@@ -4455,7 +6539,7 @@ if uploaded_file:
                     Jumlah_Node=("family_id", "count"),
                     Rerata_Usia=("Usia", "mean"),
                     Median_Usia=("Usia", "median"),
-                    Rerata_F_IKR=("F_IKR", "mean"),
+                    Rerata_IKR_Agregat=("IKR Agregat", "mean"),
                     Rerata_Weighted_Degree=("Weighted Degree", "mean"),
                 )
                 .sort_values("Klaster Louvain")
@@ -4474,7 +6558,7 @@ if uploaded_file:
                     {
                         "Rerata_Usia": "{:.1f}",
                         "Median_Usia": "{:.1f}",
-                        "Rerata_F_IKR": "{:.2f}",
+                        "Rerata_IKR_Agregat": "{:.2f}",
                         "Rerata_Weighted_Degree": "{:.2f}",
                     }
                 ),
@@ -4520,19 +6604,19 @@ if uploaded_file:
                 else:
                     st.info("Data profesi/pekerjaan belum tersedia untuk visual klaster.")
 
-        with subbab_dropdown("Visual Graf 5 Dimensi IKR", expanded=False):
+        with subbab_dropdown("Visual Jaringan Dimensi Kesejahteraan", expanded=False):
             graph_dim_label, graph_dim_col = selected_graph_dim
             raw_dim_vals = [G.nodes[n].get(graph_dim_col) for n in node_ids]
             dim_num = pd.to_numeric(pd.Series(raw_dim_vals), errors="coerce")
             dim_marker_cmin = None
             dim_marker_cmax = None
             if graph_dim_col == IKR_OVERALL_METRIC[1]:
-                # Untuk agregat F_IKR, gunakan nilai asli lalu discretize berbasis rentang data (bukan kategori BPS).
+                # Untuk IKR agregat, gunakan nilai asli lalu discretize berbasis rentang data (bukan kategori BPS).
                 valid_vals = dim_num.dropna()
                 if valid_vals.nunique() <= 1:
                     dim_marker_vals = [0 for _ in node_ids]
                     dim_colorscale = [[0.0, "#2563eb"], [1.0, "#2563eb"]]
-                    dim_colorbar = dict(title="Kelas F_IKR Agregat")
+                    dim_colorbar = dict(title="Kelas IKR Agregat")
                     dim_hover_vals = [f"{x:.3f}" if pd.notnull(x) else "NA" for x in dim_num]
                     dim_marker_cmin = 0
                     dim_marker_cmax = 1
@@ -4551,15 +6635,15 @@ if uploaded_file:
                     dim_palette = palette_main + ["#64748b"]
                     dim_colorscale = build_discrete_colorscale(dim_palette)
                     dim_colorbar = dict(
-                        title="Rentang F_IKR Agregat",
-                        tickvals=list(range(len(uniq_bins) + 1)),
-                        ticktext=bin_labels + ["Tidak Valid"],
+                        title="Rentang IKR Agregat",
+                        tickvals=list(range(len(uniq_bins))),
+                        ticktext=bin_labels,
                     )
                     dim_hover_vals = [
                         (
                             f"{_safe_float_metric(dim_num.iloc[idx], default=np.nan):.3f}"
                             f" ({bin_labels[bin_map[bins.iloc[idx]]]}" + ")"
-                            if pd.notnull(dim_num.iloc[idx]) and bins.iloc[idx] in bin_map else "NA (Tidak Valid)"
+                            if pd.notnull(dim_num.iloc[idx]) and bins.iloc[idx] in bin_map else "NA"
                         )
                         for idx in range(len(node_ids))
                     ]
@@ -4568,7 +6652,7 @@ if uploaded_file:
             elif dim_num.notna().sum() >= 3:
                 dim_marker_vals = dim_num.tolist()
                 dim_colorscale = "Blues"
-                dim_colorbar = dict(title=f"{graph_dim_label}<br>{graph_dim_col}")
+                dim_colorbar = dict(title=graph_dim_label)
                 dim_hover_vals = [f"{x:.3f}" if pd.notnull(x) else "NA" for x in dim_num]
             else:
                 dim_cat = pd.Series(raw_dim_vals).fillna("Tidak Valid").astype(str)
@@ -4577,72 +6661,59 @@ if uploaded_file:
                 dim_marker_vals = [dim_map[v] for v in dim_cat]
                 dim_colorscale = [[0.0, "#0ea5e9"], [1.0, "#0ea5e9"]] if len(dim_uniqs) == 1 else [[i / (len(dim_uniqs) - 1), CONTRAST_COLORS[i % len(CONTRAST_COLORS)]] for i in range(len(dim_uniqs))]
                 dim_colorbar = dict(
-                    title=f"{graph_dim_label}<br>{graph_dim_col}",
+                    title=graph_dim_label,
                     tickvals=list(range(len(dim_uniqs))),
                     ticktext=dim_uniqs,
                 )
                 dim_hover_vals = dim_cat.tolist()
 
-            fig_dim = go.Figure()
-            for u, v, d in G.edges(data=True):
-                w = _safe_float_metric(d.get("weight"), default=0.0)
-                w_norm = float((w - edge_min) / edge_span)
-                edge_color = edge_color_by_interaction(u, v)
-                fig_dim.add_trace(
-                    go.Scatter(
-                        x=[pos_focus[u][0], pos_focus[v][0], None],
-                        y=[pos_focus[u][1], pos_focus[v][1], None],
-                        mode="lines",
-                        line=dict(width=1.0 + (2.0 * w_norm), color=edge_color),
-                        hoverinfo="none",
-                        showlegend=False,
-                    )
+            dim_node_text = [
+                (
+                    f"Nama: {G.nodes[n].get('nama', '-')}"
+                    f"<br>{graph_dim_label}: {dim_hover_vals[idx]}"
+                    f"<br>IKR Agregat: {_safe_float_metric(G.nodes[n].get('f_ikr_dari_rekap_kk'), default=np.nan):.3f}"
+                    f"<br>Klaster Louvain: {partition.get(n, -1)}"
                 )
+                for idx, n in enumerate(node_ids)
+            ]
+            fig_dim = go.Figure()
+            add_network_edge_traces(
+                fig_dim,
+                visible_edges_focus,
+                pos_focus,
+                edge_min,
+                edge_span,
+                color_fn=edge_color_by_interaction,
+                base_width=0.28,
+                width_scale=0.78,
+                hover=False,
+            )
             fig_dim.add_trace(
                 go.Scatter(
                     x=[pos_focus[n][0] for n in node_ids],
                     y=[pos_focus[n][1] for n in node_ids],
                     mode="markers",
                     marker=dict(
-                        size=11,
+                        size=node_size_main,
                         color=dim_marker_vals,
                         colorscale=dim_colorscale,
                         cmin=dim_marker_cmin,
                         cmax=dim_marker_cmax,
                         showscale=True,
                         colorbar=dim_colorbar,
-                        line=dict(color="#0f172a", width=0.6),
+                        opacity=0.86,
+                        line=dict(color=NETWORK_NODE_LINE, width=node_line_width),
                     ),
-                    text=[
-                        (
-                            f"Nama: {G.nodes[n].get('nama', '-')}"
-                            f"<br>{graph_dim_label}: {dim_hover_vals[idx]}"
-                            f"<br>Total IKR (f_ikr_dari_rekap_kk): {_safe_float_metric(G.nodes[n].get('f_ikr_dari_rekap_kk'), default=np.nan):.3f}"
-                            f"<br>Klaster Louvain: {partition.get(n, -1)}"
-                        )
-                        for idx, n in enumerate(node_ids)
-                    ],
+                    text=dim_node_text,
                     hoverinfo="text",
                     showlegend=False,
                 )
             )
-            fig_dim.update_layout(
-                title=f"Graf Dimensi Terpilih: {graph_dim_label}",
-                height=500,
-                template="plotly_white",
-                margin=dict(l=20, r=20, t=60, b=20),
-                xaxis=dict(visible=False),
-                yaxis=dict(visible=False),
+            style_network_figure(
+                fig_dim,
+                title=f"Jaringan Kemiripan Rumah Tangga Menurut {graph_dim_label}",
+                height=690,
             )
-            dim_node_text = [
-                (
-                    f"Nama: {G.nodes[n].get('nama', '-')}"
-                    f"<br>{graph_dim_label}: {dim_hover_vals[idx]}"
-                    f"<br>Total IKR (f_ikr_dari_rekap_kk): {_safe_float_metric(G.nodes[n].get('f_ikr_dari_rekap_kk'), default=np.nan):.3f}"
-                    f"<br>Klaster Louvain: {partition.get(n, -1)}"
-                )
-                for idx, n in enumerate(node_ids)
-            ]
             if graph_spatial_mode == "Layout Jaringan":
                 st.plotly_chart(fig_dim, use_container_width=True, config=PLOTLY_DRAW_CONFIG)
             else:
@@ -4651,7 +6722,7 @@ if uploaded_file:
                     node_ids=node_ids,
                     node_color_vals=dim_marker_vals,
                     node_hover_text=dim_node_text,
-                    title=f"Graf Dimensi Terpilih (Spasial): {graph_dim_label}",
+                    title=f"Sebaran Spasial Rumah Tangga Menurut {graph_dim_label}",
                     spatial_mode=graph_spatial_mode,
                     marker_size=11,
                     colorscale=dim_colorscale,
@@ -4665,32 +6736,30 @@ if uploaded_file:
                     st.warning("Mode spasial aktif, tetapi kolom lat/lon belum valid. Ditampilkan mode layout jaringan.")
                     st.plotly_chart(fig_dim, use_container_width=True, config=PLOTLY_DRAW_CONFIG)
 
-            with subbab_dropdown("Graf Base Louvain dengan Warna Node F_IKR (Database)", expanded=False):
+            with subbab_dropdown("Graf Louvain dengan Warna Node IKR Agregat", expanded=False):
                 ikr_vals = pd.to_numeric(
                     pd.Series([G.nodes[n].get("f_ikr_dari_rekap_kk") for n in node_ids]),
                     errors="coerce",
                 )
                 ikr_hover_vals = [f"{x:.3f}" if pd.notnull(x) else "NA" for x in ikr_vals]
                 fig_ikr_focus = go.Figure()
-                for u, v, d in G.edges(data=True):
-                    w = _safe_float_metric(d.get("weight"), default=0.0)
-                    w_norm = float((w - edge_min) / edge_span)
-                    edge_color = edge_color_by_interaction(u, v)
-                    fig_ikr_focus.add_trace(
-                        go.Scatter(
-                            x=[pos_focus[u][0], pos_focus[v][0], None],
-                            y=[pos_focus[u][1], pos_focus[v][1], None],
-                            mode="lines",
-                            line=dict(width=1.0 + (2.0 * w_norm), color=edge_color),
-                            hoverinfo="none",
-                            showlegend=False,
-                        )
-                    )
+                add_network_edge_traces(
+                    fig_ikr_focus,
+                    visible_edges_focus,
+                    pos_focus,
+                    edge_min,
+                    edge_span,
+                    color_fn=edge_color_by_interaction,
+                    base_width=0.28,
+                    width_scale=0.78,
+                    hover=False,
+                )
                 marker_ikr = dict(
-                    size=11,
-                    line=dict(color="#0f172a", width=0.6),
+                    size=node_size_main,
+                    line=dict(color=NETWORK_NODE_LINE, width=node_line_width),
+                    opacity=0.86,
                     showscale=True,
-                    colorbar=dict(title="F_IKR<br>(Database)"),
+                    colorbar=dict(title="IKR Agregat"),
                 )
                 if ikr_vals.notna().sum() >= 1:
                     valid_ikr = ikr_vals.dropna()
@@ -4705,13 +6774,13 @@ if uploaded_file:
                         ikr_mids = ((ikr_edges[:-1] + ikr_edges[1:]) / 2.0).tolist()
                         ikr_labels = [f"{ikr_edges[i]:.2f} - {ikr_edges[i+1]:.2f}" for i in range(len(ikr_edges) - 1)]
                         marker_ikr["colorbar"] = dict(
-                            title="F_IKR (Database)<br>Rentang Nilai",
+                            title="IKR Agregat<br>Rentang Nilai",
                             tickvals=ikr_mids,
                             ticktext=ikr_labels,
                         )
                     else:
                         marker_ikr["colorbar"] = dict(
-                            title="F_IKR (Database)",
+                            title="IKR Agregat",
                             tickvals=[ikr_min],
                             ticktext=[f"{ikr_min:.2f}"],
                         )
@@ -4727,7 +6796,7 @@ if uploaded_file:
                         text=[
                             (
                                 f"Nama: {G.nodes[n].get('nama', '-')}"
-                                f"<br>F_IKR (Database): {ikr_hover_vals[idx]}"
+                                f"<br>IKR Agregat: {ikr_hover_vals[idx]}"
                                 f"<br>{graph_dim_label}: {dim_hover_vals[idx]}"
                                 f"<br>Klaster Louvain: {partition.get(n, -1)}"
                             )
@@ -4737,18 +6806,15 @@ if uploaded_file:
                         showlegend=False,
                     )
                 )
-                fig_ikr_focus.update_layout(
-                    title="Graf Base Louvain: Pewarnaan Node Berdasarkan F_IKR (Variabel Utama)",
-                    height=500,
-                    template="plotly_white",
-                    margin=dict(l=20, r=20, t=60, b=20),
-                    xaxis=dict(visible=False),
-                    yaxis=dict(visible=False),
+                style_network_figure(
+                    fig_ikr_focus,
+                    title="Jaringan Louvain dengan Pewarnaan IKR Agregat",
+                    height=690,
                 )
                 ikr_node_text = [
                     (
                         f"Nama: {G.nodes[n].get('nama', '-')}"
-                        f"<br>F_IKR (Database): {ikr_hover_vals[idx]}"
+                        f"<br>IKR Agregat: {ikr_hover_vals[idx]}"
                         f"<br>{graph_dim_label}: {dim_hover_vals[idx]}"
                         f"<br>Klaster Louvain: {partition.get(n, -1)}"
                     )
@@ -4762,11 +6828,11 @@ if uploaded_file:
                         node_ids=node_ids,
                         node_color_vals=marker_ikr.get("color", [0.0 for _ in node_ids]) if isinstance(marker_ikr.get("color", None), list) else [0.0 for _ in node_ids],
                         node_hover_text=ikr_node_text,
-                        title="Graf Base Louvain Spasial: Pewarnaan Node Berdasarkan F_IKR",
+                        title="Sebaran Spasial Louvain Berdasarkan IKR Agregat",
                         spatial_mode=graph_spatial_mode,
                         marker_size=11,
                         colorscale=marker_ikr.get("colorscale", "RdYlGn"),
-                        colorbar=marker_ikr.get("colorbar", dict(title="F_IKR")),
+                        colorbar=marker_ikr.get("colorbar", dict(title="IKR Agregat")),
                         cmin=marker_ikr.get("cmin"),
                         cmax=marker_ikr.get("cmax"),
                     )
@@ -4776,7 +6842,7 @@ if uploaded_file:
                         st.warning("Mode spasial aktif, tetapi kolom lat/lon belum valid. Ditampilkan mode layout jaringan.")
                         st.plotly_chart(fig_ikr_focus, use_container_width=True, config=PLOTLY_DRAW_CONFIG)
 
-        with subbab_dropdown("Tahap Assortativity: 5 Dimensi IKR (Numerical)", expanded=False):
+        with subbab_dropdown("Assortativity Numerik per Dimensi Kesejahteraan", expanded=False):
             st.caption(
                 "Sesuai Newman (2003), nilai r tiap dimensi dihitung sebagai korelasi Pearson antar nilai atribut pada pasangan node yang terhubung (edge)."
             )
@@ -4802,9 +6868,10 @@ if uploaded_file:
 
                 top_ikr = df_assort_dims.iloc[0] if not df_assort_dims.empty else df_assort_agg.iloc[0]
 
-                st.markdown("#### Output Terpisah: Dimensi IKR (F_A..F_E)")
+                st.markdown("#### Assortativity per Dimensi Kesejahteraan")
+                df_assort_dims_display = df_assort_dims.drop(columns=["Kolom Internal"], errors="ignore")
                 st.dataframe(
-                    df_assort_dims.style.background_gradient(cmap="RdYlGn", subset=["Assortativity r"]),
+                    df_assort_dims_display.style.background_gradient(cmap="RdYlGn", subset=["Assortativity r"]),
                     use_container_width=True,
                 )
                 fig_assort_ikr_dim = px.bar(
@@ -4815,16 +6882,17 @@ if uploaded_file:
                     color="Assortativity r",
                     color_continuous_scale="RdYlGn",
                     range_color=[-1, 1],
-                    hover_data=["Kolom Database", "Arah", "Kekuatan"],
-                    title="Perbandingan Assortativity per Dimensi IKR (F_A..F_E)",
+                    hover_data=["Sumber Skor", "Arah", "Kekuatan"],
+                    title="Perbandingan Assortativity per Dimensi Kesejahteraan",
                 )
                 fig_assort_ikr_dim.add_vline(x=0.0, line_dash="dash", line_color="#64748b")
                 fig_assort_ikr_dim.update_layout(height=420, yaxis_title="", xaxis_title="Koefisien Assortativity (r)")
                 st.plotly_chart(fig_assort_ikr_dim, use_container_width=True, config=PLOTLY_DRAW_CONFIG)
 
-                with subbab_dropdown("Output Terpisah: F_IKR Agregat & Gabungan 5 Dimensi", expanded=False):
+                with subbab_dropdown("IKR Agregat dan Ringkasan Lima Dimensi", expanded=False):
+                    df_assort_agg_display = df_assort_agg.drop(columns=["Kolom Internal"], errors="ignore")
                     st.dataframe(
-                        df_assort_agg.style.background_gradient(cmap="RdYlGn", subset=["Assortativity r"]),
+                        df_assort_agg_display.style.background_gradient(cmap="RdYlGn", subset=["Assortativity r"]),
                         use_container_width=True,
                     )
                     fig_assort_ikr_agg = px.bar(
@@ -4835,8 +6903,8 @@ if uploaded_file:
                         color="Assortativity r",
                         color_continuous_scale="RdYlGn",
                         range_color=[-1, 1],
-                        hover_data=["Kolom Database", "Arah", "Kekuatan"],
-                        title="Perbandingan F_IKR Agregat vs Ringkasan 5 Dimensi",
+                        hover_data=["Sumber Skor", "Arah", "Kekuatan"],
+                        title="Perbandingan IKR Agregat dan Ringkasan Lima Dimensi",
                     )
                     fig_assort_ikr_agg.add_vline(x=0.0, line_dash="dash", line_color="#64748b")
                     fig_assort_ikr_agg.update_layout(height=320, yaxis_title="", xaxis_title="Koefisien Assortativity (r)")
@@ -4861,7 +6929,7 @@ if uploaded_file:
                     r_ikr_agg, _ = compute_assortativity_for_column(G, "f_ikr_dari_rekap_kk")
                     dir_ikr_agg, lvl_ikr_agg = interpret_assortativity_value(r_ikr_agg)
                     c_ag1, c_ag2 = st.columns(2)
-                    c_ag1.metric("r IKR Agregat (F_IKR)", f"{_safe_float_metric(r_ikr_agg, default=0.0):.4f}", f"{dir_ikr_agg} | {lvl_ikr_agg}")
+                    c_ag1.metric("r IKR Agregat", f"{_safe_float_metric(r_ikr_agg, default=0.0):.4f}", f"{dir_ikr_agg} | {lvl_ikr_agg}")
                     if summary_base_row:
                         c_ag2.metric(
                             "r Gabungan 5 Dimensi",
@@ -4871,7 +6939,7 @@ if uploaded_file:
                     else:
                         c_ag2.metric("r Gabungan 5 Dimensi", "NA", "-")
                     st.caption(
-                        f"Layer Struktural: {dim_label} ({dim_col}) | metode={method_dim}. "
+                        f"Layer Struktural: {dim_label} | metode={method_dim}. "
                         "Layer Investigatif: seluruh variabel penyusun dimensi ditampilkan otomatis tanpa pemilihan variabel manual."
                     )
                     drill_rows = []
@@ -4929,22 +6997,19 @@ if uploaded_file:
                     if missing_vars:
                         st.warning(f"Kolom belum terdeteksi untuk variabel: {', '.join(missing_vars)}")
 
-                    with subbab_dropdown("Graf Pendukung per Variabel", expanded=False):
-                        for vcfg, vcol, r_v in resolved_for_plot:
-                            fig_var = go.Figure()
-                            for u, v, d in G.edges(data=True):
-                                w = _safe_float_metric(d.get("weight"), default=0.0)
-                                w_norm = float((w - edge_min) / edge_span)
-                                edge_color = edge_color_by_interaction(u, v)
-                                fig_var.add_trace(
-                                    go.Scatter(
-                                        x=[pos_focus[u][0], pos_focus[v][0], None],
-                                        y=[pos_focus[u][1], pos_focus[v][1], None],
-                                        mode="lines",
-                                        line=dict(width=1.0 + (2.0 * w_norm), color=edge_color),
-                                        hoverinfo="none",
-                                        showlegend=False,
-                                    )
+                        with subbab_dropdown("Graf Pendukung per Variabel", expanded=False):
+                            for vcfg, vcol, r_v in resolved_for_plot:
+                                fig_var = go.Figure()
+                                add_network_edge_traces(
+                                    fig_var,
+                                    visible_edges_focus,
+                                    pos_focus,
+                                    edge_min,
+                                    edge_span,
+                                    color_fn=edge_color_by_interaction,
+                                    base_width=0.26,
+                                    width_scale=0.72,
+                                    hover=False,
                                 )
                             raw_var_vals = [G.nodes[n].get(vcol) for n in node_ids]
                             num_var = pd.to_numeric(pd.Series(raw_var_vals), errors="coerce")
@@ -4967,25 +7032,30 @@ if uploaded_file:
                                 hover_vals = cat_vals.tolist()
                                 marker_cmin = 0
                                 marker_cmax = max(len(uniq) - 1, 1)
-                            fig_var.add_trace(
-                                go.Scatter(
-                                    x=[pos_focus[n][0] for n in node_ids],
-                                    y=[pos_focus[n][1] for n in node_ids],
-                                    mode="markers",
-                                    marker=dict(size=11, color=marker_vals, colorscale=marker_scale, showscale=True, colorbar=marker_cbar, line=dict(color="#0f172a", width=0.6)),
-                                    text=[f"{G.nodes[n].get('nama','-')}<br>{vcfg['label']}: {hover_vals[idx]}<br>Klaster: {partition.get(n, -1)}" for idx, n in enumerate(node_ids)],
-                                    hoverinfo="text",
-                                    showlegend=False,
+                                fig_var.add_trace(
+                                    go.Scatter(
+                                        x=[pos_focus[n][0] for n in node_ids],
+                                        y=[pos_focus[n][1] for n in node_ids],
+                                        mode="markers",
+                                        marker=dict(
+                                            size=node_size_main,
+                                            color=marker_vals,
+                                            colorscale=marker_scale,
+                                            showscale=True,
+                                            colorbar=marker_cbar,
+                                            opacity=0.86,
+                                            line=dict(color=NETWORK_NODE_LINE, width=node_line_width),
+                                        ),
+                                        text=[f"{G.nodes[n].get('nama','-')}<br>{vcfg['label']}: {hover_vals[idx]}<br>Klaster: {partition.get(n, -1)}" for idx, n in enumerate(node_ids)],
+                                        hoverinfo="text",
+                                        showlegend=False,
                                 )
                             )
-                            fig_var.update_layout(
-                                title=f"Graf Variabel {vcfg['label']} | r={r_v:.4f}",
-                                height=500,
-                                template="plotly_white",
-                                margin=dict(l=20, r=20, t=60, b=20),
-                                xaxis=dict(visible=False),
-                                yaxis=dict(visible=False),
-                            )
+                                style_network_figure(
+                                    fig_var,
+                                    title=f"Jaringan Variabel {vcfg['label']} | r={r_v:.4f}",
+                                    height=660,
+                                )
                             var_hover_text = [
                                 f"{G.nodes[n].get('nama','-')}<br>{vcfg['label']}: {hover_vals[idx]}<br>Klaster: {partition.get(n, -1)}"
                                 for idx, n in enumerate(node_ids)
@@ -4998,7 +7068,7 @@ if uploaded_file:
                                     node_ids=node_ids,
                                     node_color_vals=marker_vals,
                                     node_hover_text=var_hover_text,
-                                    title=f"Graf Variabel {vcfg['label']} (Spasial) | r={r_v:.4f}",
+                                    title=f"Sebaran Spasial Variabel {vcfg['label']} | r={r_v:.4f}",
                                     spatial_mode=graph_spatial_mode,
                                     marker_size=11,
                                     colorscale=marker_scale,
@@ -5030,7 +7100,7 @@ if uploaded_file:
                     st.markdown(
                         f"<div class='soft-card'><b>Interpretasi Dominan:</b><br>"
                         f"Dimensi dengan nilai r tertinggi saat ini adalah <b>{top_ikr['Dimensi IKR']}</b> "
-                        f"({top_ikr['Kolom Database']}) dengan r = <b>{float(top_ikr['Assortativity r']):.4f}</b> "
+                        f"({top_ikr['Sumber Skor']}) dengan r = <b>{float(top_ikr['Assortativity r']):.4f}</b> "
                         f"({top_ikr['Arah']} | {top_ikr['Kekuatan']}). "
                         f"Ini menunjukkan dimensi tersebut paling kuat berkontribusi pada pola sekat sosial dalam jaringan desa terpilih."
                         f"</div>",
@@ -5038,7 +7108,7 @@ if uploaded_file:
                     )
             with subbab_dropdown("Audit Kebijakan: Assortativity Variabel Biner (Newman, 2003)", expanded=False):
                 st.caption(
-                    "Base graph tetap dibentuk dari 5 dimensi IKR (F_A..F_E). Variabel Bansos, Internet, Ponsel, dan Spasial (dusun) hanya dipakai pada tahap audit assortativity atribut."
+                    "Base graph tetap dibentuk dari lima dimensi kesejahteraan. Variabel Bansos, Internet, Ponsel, dan Spasial (dusun) hanya dipakai pada tahap audit assortativity atribut."
                 )
                 st.caption(
                     "Variabel dusun tidak diikutkan ke pembobotan graf, sehingga hasil audit spasial tetap objektif terhadap struktur graf dasar."
@@ -5096,40 +7166,48 @@ if uploaded_file:
                     hover_data=["Kolom", "Qw*", "Qb*", "Arah", "Kekuatan", "Label Steinley"],
                 )
                 fig_biner.add_hline(y=0.0, line_dash="dash", line_color="#475569")
-                fig_biner.update_layout(height=420, yaxis_title="Koefisien Assortativity (r)", xaxis_title="")
+                fig_biner.update_traces(marker_line_color="#111827", marker_line_width=0.45)
+                style_publication_figure(
+                    fig_biner,
+                    title="Perbandingan Assortativity Audit Kebijakan & Spasial",
+                    height=420,
+                    xaxis_title="",
+                    yaxis_title="Koefisien Assortativity (r)",
+                    showlegend=False,
+                )
                 st.plotly_chart(fig_biner, use_container_width=True, config=PLOTLY_DRAW_CONFIG)
                 st.dataframe(
                     df_assort_biner.style.background_gradient(cmap="RdYlGn", subset=["r"]),
                     use_container_width=True,
                 )
-                with subbab_dropdown("Sebaran Distribusi Dimensi & Fokus F_IKR (Database)", expanded=False):
+                with subbab_dropdown("Sebaran Dimensi dan IKR Agregat", expanded=False):
                     st.caption(
-                        "Distribusi ini ditempatkan di bawah audit kebijakan karena dipakai untuk membaca konteks bansos/spasial terhadap kondisi dimensi dan F_IKR desa."
+                        "Distribusi ini ditempatkan di bawah audit kebijakan karena dipakai untuk membaca konteks bansos/spasial terhadap kondisi dimensi dan IKR agregat desa."
                     )
                     df_graph_dims = pd.DataFrame(
                         [
                             {
                                 "family_id": n,
                                 "Klaster Louvain": int(partition.get(n, -1)),
-                                "F_A": _safe_float_metric(G.nodes[n].get("f_a_dari_rekap_kk"), default=np.nan),
-                                "F_B": _safe_float_metric(G.nodes[n].get("f_b_dari_rekap_kk"), default=np.nan),
-                                "F_C": _safe_float_metric(G.nodes[n].get("f_c_dari_rekap_kk"), default=np.nan),
-                                "F_D": _safe_float_metric(G.nodes[n].get("f_d_dari_rekap_kk"), default=np.nan),
-                                "F_E": _safe_float_metric(G.nodes[n].get("f_e_dari_rekap_kk"), default=np.nan),
-                                "F_IKR": _safe_float_metric(G.nodes[n].get("f_ikr_dari_rekap_kk"), default=np.nan),
+                                "Sandang, Pangan, dan Papan": _safe_float_metric(G.nodes[n].get("f_a_dari_rekap_kk"), default=np.nan),
+                                "Pendidikan": _safe_float_metric(G.nodes[n].get("f_b_dari_rekap_kk"), default=np.nan),
+                                "Sosial, Hukum, dan HAM": _safe_float_metric(G.nodes[n].get("f_c_dari_rekap_kk"), default=np.nan),
+                                "Kesehatan dan Pekerjaan": _safe_float_metric(G.nodes[n].get("f_d_dari_rekap_kk"), default=np.nan),
+                                "Lingkungan dan Infrastruktur": _safe_float_metric(G.nodes[n].get("f_e_dari_rekap_kk"), default=np.nan),
+                                "IKR Agregat": _safe_float_metric(G.nodes[n].get("f_ikr_dari_rekap_kk"), default=np.nan),
                             }
                             for n in node_ids
                         ]
                     )
                     dim_long = df_graph_dims.melt(
                         id_vars=["family_id", "Klaster Louvain"],
-                        value_vars=["F_A", "F_B", "F_C", "F_D", "F_E"],
+                        value_vars=list(PSEUDO_DIMENSION_COLS),
                         var_name="Dimensi",
                         value_name="Skor",
                     ).dropna(subset=["Skor"])
 
                     dist_tab1, dist_tab2, dist_tab3 = st.tabs(
-                        ["Distribusi 5 Dimensi", "Per Dimensi per Klaster", "F_IKR Keseluruhan (Database)"]
+                        ["Distribusi Lima Dimensi", "Per Dimensi per Klaster", "IKR Agregat Database"]
                     )
                     with dist_tab1:
                         if not dim_long.empty:
@@ -5140,7 +7218,7 @@ if uploaded_file:
                                 nbins=22,
                                 barmode="overlay",
                                 opacity=0.62,
-                                title="Histogram Sebaran Skor 5 Dimensi (Node Graf)",
+                                title="Histogram Sebaran Skor Lima Dimensi (Node Graf)",
                             )
                             fig_dim_hist.update_layout(template="plotly_white", xaxis_title="Skor", yaxis_title="Frekuensi")
                             st.plotly_chart(fig_dim_hist, use_container_width=True, config=PLOTLY_DRAW_CONFIG)
@@ -5150,7 +7228,7 @@ if uploaded_file:
                                 x="Dimensi",
                                 y="Skor",
                                 color="Dimensi",
-                                title="Ringkasan Sebaran (Boxplot) 5 Dimensi",
+                                title="Ringkasan Sebaran Lima Dimensi",
                             )
                             fig_dim_box.update_layout(template="plotly_white")
                             st.plotly_chart(fig_dim_box, use_container_width=True, config=PLOTLY_DRAW_CONFIG)
@@ -5199,16 +7277,16 @@ if uploaded_file:
                             ikr_series = pd.to_numeric(df_db_ikr["f_ikr_dari_rekap_kk"], errors="coerce").dropna()
                             if not ikr_series.empty:
                                 d1, d2, d3, d4 = st.columns(4)
-                                d1.metric("N Data F_IKR", f"{int(ikr_series.shape[0])}")
-                                d2.metric("Mean F_IKR", f"{float(ikr_series.mean()):.2f}")
-                                d3.metric("Median F_IKR", f"{float(ikr_series.median()):.2f}")
-                                d4.metric("Std F_IKR", f"{float(ikr_series.std()):.2f}")
+                                d1.metric("N Data IKR Agregat", f"{int(ikr_series.shape[0])}")
+                                d2.metric("Mean IKR Agregat", f"{float(ikr_series.mean()):.2f}")
+                                d3.metric("Median IKR Agregat", f"{float(ikr_series.median()):.2f}")
+                                d4.metric("Std IKR Agregat", f"{float(ikr_series.std()):.2f}")
 
                                 fig_ikr_hist = px.histogram(
                                     x=ikr_series,
                                     nbins=24,
-                                    title="Histogram F_IKR Keseluruhan (Database Desa Terpilih)",
-                                    labels={"x": "F_IKR"},
+                                    title="Histogram IKR Agregat Keseluruhan (Database Desa Terpilih)",
+                                    labels={"x": "IKR Agregat"},
                                 )
                                 fig_ikr_hist.add_vline(x=float(ikr_series.mean()), line_dash="dash", line_color="#1d4ed8", annotation_text="Mean")
                                 fig_ikr_hist.add_vline(x=float(ikr_series.median()), line_dash="dot", line_color="#0f766e", annotation_text="Median")
@@ -5216,47 +7294,49 @@ if uploaded_file:
                                 st.plotly_chart(fig_ikr_hist, use_container_width=True, config=PLOTLY_DRAW_CONFIG)
 
                                 cat_df = add_bps_ikr_category(df_db_ikr, ikr_col="f_ikr_dari_rekap_kk")
-                                cat_order = ["Sangat Tinggi", "Tinggi", "Sedang", "Rendah", "Tidak Valid"]
+                                cat_order = ordered_existing_categories(cat_df["kategori_ikr"], BPS_CATEGORY_ORDER)
                                 cat_count = (
                                     cat_df["kategori_ikr"]
-                                    .fillna("Tidak Valid")
                                     .value_counts()
                                     .reindex(cat_order, fill_value=0)
                                     .rename_axis("Kategori BPS")
                                     .reset_index(name="Jumlah")
                                 )
-                                fig_cat = px.bar(
-                                    cat_count,
-                                    x="Kategori BPS",
-                                    y="Jumlah",
-                                    color="Kategori BPS",
-                                    color_discrete_sequence=["#1d4ed8", "#2563eb", "#3b82f6", "#60a5fa", "#93c5fd"],
-                                    title="Komposisi Kategori BPS dari F_IKR Database",
-                                )
-                                fig_cat.update_layout(template="plotly_white", showlegend=False)
-                                st.plotly_chart(fig_cat, use_container_width=True, config=PLOTLY_DRAW_CONFIG)
-                                st.dataframe(cat_count, use_container_width=True)
+                                if cat_count.empty:
+                                    st.info("Kategori BPS valid belum tersedia pada data desa terpilih.")
+                                else:
+                                    fig_cat = px.bar(
+                                        cat_count,
+                                        x="Kategori BPS",
+                                        y="Jumlah",
+                                        color="Kategori BPS",
+                                        color_discrete_map=BPS_CATEGORY_COLORS,
+                                        title="Komposisi Kategori BPS dari IKR Agregat Database",
+                                    )
+                                    fig_cat.update_layout(template="plotly_white", showlegend=False)
+                                    st.plotly_chart(fig_cat, use_container_width=True, config=PLOTLY_DRAW_CONFIG)
+                                    st.dataframe(cat_count, use_container_width=True)
 
-                                top_cat_row = cat_count.iloc[cat_count["Jumlah"].idxmax()]
-                                st.markdown(
-                                    f"<div class='soft-card'><b>Interpretasi F_IKR Database:</b><br>"
-                                    f"Distribusi F_IKR desa ini memiliki rerata <b>{float(ikr_series.mean()):.2f}</b> "
-                                    f"dan median <b>{float(ikr_series.median()):.2f}</b>. "
-                                    f"Kategori BPS paling dominan adalah <b>{top_cat_row['Kategori BPS']}</b> "
-                                    f"dengan jumlah <b>{int(top_cat_row['Jumlah'])}</b> rumah tangga.</div>",
-                                    unsafe_allow_html=True,
-                                )
+                                    top_cat_row = cat_count.iloc[cat_count["Jumlah"].idxmax()]
+                                    st.markdown(
+                                        f"<div class='soft-card'><b>Interpretasi IKR Agregat Database:</b><br>"
+                                        f"Distribusi IKR agregat desa ini memiliki rerata <b>{float(ikr_series.mean()):.2f}</b> "
+                                        f"dan median <b>{float(ikr_series.median()):.2f}</b>. "
+                                        f"Kategori BPS paling dominan adalah <b>{top_cat_row['Kategori BPS']}</b> "
+                                        f"dengan jumlah <b>{int(top_cat_row['Jumlah'])}</b> rumah tangga.</div>",
+                                        unsafe_allow_html=True,
+                                    )
                             else:
-                                st.info("Kolom F_IKR tersedia, tetapi nilainya belum valid untuk distribusi.")
+                                st.info("Kolom IKR agregat tersedia, tetapi nilainya belum valid untuk distribusi.")
                         else:
-                            st.info("Kolom `f_ikr_dari_rekap_kk` tidak ditemukan di database desa terpilih.")
-            with subbab_dropdown("Visualisasi Graf Audit Kebijakan (Biner)", expanded=False):
+                            st.info("Kolom IKR agregat tidak ditemukan di database desa terpilih.")
+            with subbab_dropdown("Visualisasi Jaringan Audit Kebijakan", expanded=False):
                 raw_bansos_col = resolve_first_existing_column(df_v.columns, ["bansos", "keikutsertaan program bantuan"])
                 raw_media_col = resolve_first_existing_column(df_v.columns, ["media informasi", "media_informasi", "wifi", "medsos"])
                 raw_ponsel_col = resolve_first_existing_column(df_v.columns, ["kepemilikan ponsel", "kepemilikan_ponsel", "ponsel", "hp"])
                 audit_graph_specs = [
                     {
-                        "title": "Graf Audit Bansos",
+                        "title": "Jaringan Audit Bantuan Sosial",
                         "col": "bansos_num",
                         "label": "Status Bansos",
                         "yes_label": "Penerima Bantuan",
@@ -5264,7 +7344,7 @@ if uploaded_file:
                         "raw_col": raw_bansos_col,
                     },
                     {
-                        "title": "Graf Audit Digital (Internet/Media Informasi)",
+                        "title": "Jaringan Audit Akses Internet dan Media Informasi",
                         "col": "internet_num",
                         "label": "Akses Internet/Media Informasi",
                         "yes_label": "Memiliki Akses Informasi",
@@ -5272,7 +7352,7 @@ if uploaded_file:
                         "raw_col": raw_media_col,
                     },
                     {
-                        "title": "Graf Audit Kepemilikan Ponsel",
+                        "title": "Jaringan Audit Kepemilikan Ponsel",
                         "col": "ponsel_num",
                         "label": "Kepemilikan Ponsel",
                         "yes_label": "Memiliki Ponsel",
@@ -5280,7 +7360,7 @@ if uploaded_file:
                         "raw_col": raw_ponsel_col,
                     },
                     {
-                        "title": f"Graf Audit Spasial ({dusun_attr})",
+                        "title": f"Jaringan Audit Spasial ({dusun_attr})",
                         "col": dusun_attr,
                         "label": f"Wilayah {dusun_attr}",
                         "kind": "categorical",
@@ -5299,20 +7379,17 @@ if uploaded_file:
                             m2.metric("Qw*", f"{float(row_m.iloc[0]['Qw*']):.4f}")
                             m3.metric("Qb*", f"{float(row_m.iloc[0]['Qb*']):.4f}")
                         fig_audit_graph = go.Figure()
-                        for u, v, d in G.edges(data=True):
-                            w = _safe_float_metric(d.get("weight"), default=0.0)
-                            w_norm = float((w - edge_min) / edge_span)
-                            edge_color = edge_color_by_interaction(u, v)
-                            fig_audit_graph.add_trace(
-                                go.Scatter(
-                                    x=[pos_focus[u][0], pos_focus[v][0], None],
-                                    y=[pos_focus[u][1], pos_focus[v][1], None],
-                                    mode="lines",
-                                    line=dict(width=1.0 + (2.0 * w_norm), color=edge_color),
-                                    hoverinfo="none",
-                                    showlegend=False,
-                                )
-                            )
+                        add_network_edge_traces(
+                            fig_audit_graph,
+                            visible_edges_focus,
+                            pos_focus,
+                            edge_min,
+                            edge_span,
+                            color_fn=edge_color_by_interaction,
+                            base_width=0.26,
+                            width_scale=0.72,
+                            hover=False,
+                        )
                         if spec.get("kind") == "categorical":
                             cat_vals = pd.Series([G.nodes[n].get(spec["col"]) for n in node_ids]).fillna("Tidak Valid").astype(str)
                             if spec["col"] == dusun_attr and graph_spatial_mode != "Layout Jaringan":
@@ -5337,7 +7414,7 @@ if uploaded_file:
                         else:
                             bin_vals = [int(_safe_float_metric(G.nodes[n].get(spec["col"]), default=0.0) > 0) for n in node_ids]
                             node_color_vals = bin_vals
-                            node_colorscale = [[0.0, DDP_RED], [1.0, "#00D4FF"]]
+                            node_colorscale = [[0.0, DDP_RED], [1.0, BINARY_COLOR_MAP["YA"]]]
                             colorbar_cfg = dict(
                                 title=spec["label"],
                                 tickvals=[0, 1],
@@ -5349,21 +7426,22 @@ if uploaded_file:
                                 x=[pos_focus[n][0] for n in node_ids],
                                 y=[pos_focus[n][1] for n in node_ids],
                                 mode="markers",
-                                marker=dict(
-                                    size=11,
-                                    color=node_color_vals,
-                                    colorscale=node_colorscale,
-                                    cmin=0,
-                                    cmax=1 if spec.get("kind") != "categorical" else max(len(set(node_color_vals)) - 1, 1),
-                                    showscale=True,
-                                    colorbar=colorbar_cfg,
-                                    line=dict(color="#0f172a", width=0.6),
-                                ),
+                                    marker=dict(
+                                        size=node_size_main,
+                                        color=node_color_vals,
+                                        colorscale=node_colorscale,
+                                        cmin=0,
+                                        cmax=1 if spec.get("kind") != "categorical" else max(len(set(node_color_vals)) - 1, 1),
+                                        showscale=True,
+                                        colorbar=colorbar_cfg,
+                                        opacity=0.86,
+                                        line=dict(color=NETWORK_NODE_LINE, width=node_line_width),
+                                    ),
                                 text=[
                                     (
                                         f"Nama: {G.nodes[n].get('nama', '-')}"
                                         f"<br>{graph_dim_label}: {_safe_float_metric(G.nodes[n].get(graph_dim_col), default=np.nan):.3f}"
-                                        f"<br>Total IKR (f_ikr_dari_rekap_kk): {_safe_float_metric(G.nodes[n].get('f_ikr_dari_rekap_kk'), default=np.nan):.3f}"
+                                        f"<br>IKR Agregat: {_safe_float_metric(G.nodes[n].get('f_ikr_dari_rekap_kk'), default=np.nan):.3f}"
                                         f"<br>{spec['label']}: {state_text[i]}"
                                         f"<br>Jenis/Detail: {G.nodes[n].get(spec['raw_col'], '-') if spec['raw_col'] else '-'}"
                                     )
@@ -5377,20 +7455,13 @@ if uploaded_file:
                             (
                                 f"Nama: {G.nodes[n].get('nama', '-')}"
                                 f"<br>{graph_dim_label}: {_safe_float_metric(G.nodes[n].get(graph_dim_col), default=np.nan):.3f}"
-                                f"<br>Total IKR (f_ikr_dari_rekap_kk): {_safe_float_metric(G.nodes[n].get('f_ikr_dari_rekap_kk'), default=np.nan):.3f}"
+                                f"<br>IKR Agregat: {_safe_float_metric(G.nodes[n].get('f_ikr_dari_rekap_kk'), default=np.nan):.3f}"
                                 f"<br>{spec['label']}: {state_text[i]}"
                                 f"<br>Jenis/Detail: {G.nodes[n].get(spec['raw_col'], '-') if spec['raw_col'] else '-'}"
                             )
                             for i, n in enumerate(node_ids)
                         ]
-                        fig_audit_graph.update_layout(
-                            title=spec["title"],
-                            height=500,
-                            template="plotly_white",
-                            margin=dict(l=20, r=20, t=60, b=20),
-                            xaxis=dict(visible=False),
-                            yaxis=dict(visible=False),
-                        )
+                        style_network_figure(fig_audit_graph, title=spec["title"], height=660)
                         if graph_spatial_mode == "Layout Jaringan":
                             st.plotly_chart(fig_audit_graph, use_container_width=True, config=PLOTLY_DRAW_CONFIG)
                         else:
@@ -5413,22 +7484,18 @@ if uploaded_file:
                                 st.warning("Mode spasial aktif, tetapi kolom lat/lon belum valid. Ditampilkan mode layout jaringan.")
                                 st.plotly_chart(fig_audit_graph, use_container_width=True, config=PLOTLY_DRAW_CONFIG)
                         if spec.get("kind") == "categorical" and spec["col"] == dusun_attr:
-                            comp_rows = []
-                            for n in node_ids:
-                                comp_rows.append(
-                                    {
-                                        "Dusun": str(G.nodes[n].get(dusun_attr, "Tidak Valid")),
-                                        "Klaster Louvain": int(partition.get(n, -1)),
-                                    }
+                            st.markdown("##### Komposisi Klaster per Dusun (Mengacu Graf Base Louvain)")
+                            if "df_dusun_cluster_wide" in locals() and not df_dusun_cluster_wide.empty:
+                                pct_cols_tab = [c for c in df_dusun_cluster_wide.columns if c.endswith("Persentase (%)")]
+                                fmt_cols_tab = {c: "{:.1f}" for c in pct_cols_tab}
+                                count_cols_tab = [c for c in df_dusun_cluster_wide.columns if c.endswith("Jumlah KK") or c == "Total KK Dusun"]
+                                fmt_cols_tab.update({c: "{:,.0f}" for c in count_cols_tab})
+                                st.dataframe(
+                                    df_dusun_cluster_wide.style.format(fmt_cols_tab).background_gradient(cmap="YlGnBu", subset=pct_cols_tab),
+                                    use_container_width=True,
                                 )
-                            if comp_rows:
-                                df_comp = pd.DataFrame(comp_rows)
-                                comp_tbl = (
-                                    pd.crosstab(df_comp["Dusun"], df_comp["Klaster Louvain"])
-                                    .reset_index()
-                                )
-                                st.markdown("##### Komposisi Klaster per Dusun (Mengacu Graf Base Louvain)")
-                                st.dataframe(comp_tbl, use_container_width=True)
+                            else:
+                                st.info("Tabel proporsi klaster per dusun belum tersedia untuk graf aktif.")
 
             with subbab_dropdown("Rincian Persentase Keterhubungan Audit Biner", expanded=False):
                 st.caption(
@@ -5678,12 +7745,11 @@ if uploaded_file:
                                 unsafe_allow_html=True,
                             )
 
-            with subbab_dropdown("Evaluasi Ketepatan Targeting (Layak = F_IKR Rendah + Sedang)", expanded=False):
+            with subbab_dropdown("Evaluasi Ketepatan Targeting (Layak = IKR Agregat Rendah + Sedang)", expanded=False):
                 eval_cols_needed = {"family_id", "f_ikr_dari_rekap_kk", "kategori_ikr"}
                 if not eval_cols_needed.issubset(set(df_v.columns)):
                     st.warning(
-                        "Kolom evaluasi targeting belum lengkap. Pastikan tersedia `family_id`, "
-                        "`f_ikr_dari_rekap_kk`, dan `kategori_ikr`."
+                        "Kolom evaluasi targeting belum lengkap. Pastikan tersedia family_id, IKR agregat, dan kategori IKR."
                     )
                 else:
                     node_set_eval = set(node_ids)
@@ -5693,7 +7759,7 @@ if uploaded_file:
                         st.caption(
                             f"Catatan: {dropped_rows} KK berada di luar graf analisis aktif sehingga tidak masuk evaluasi targeting."
                         )
-                    df_eval["F_IKR"] = pd.to_numeric(df_eval["f_ikr_dari_rekap_kk"], errors="coerce")
+                    df_eval["IKR Agregat"] = pd.to_numeric(df_eval["f_ikr_dari_rekap_kk"], errors="coerce")
                     df_eval["Layak_Target"] = df_eval["kategori_ikr"].isin(["Rendah", "Sedang"]).astype(int)
                     df_eval["Klaster Louvain"] = df_eval["family_id"].map(
                         lambda fid: int(partition.get(fid, -1)) if fid in partition else -1
@@ -5734,13 +7800,13 @@ if uploaded_file:
                             use_container_width=True,
                         )
 
-                        show_cols = ["family_id", "nama", "Klaster Louvain", "F_IKR", "kategori_ikr"]
+                        show_cols = ["family_id", "nama", "Klaster Louvain", "IKR Agregat", "kategori_ikr"]
                         if dusun_attr in df_eval.columns:
                             show_cols.append(dusun_attr)
                         temp = df_eval.copy()
                         temp["status_target"] = status.values
-                        exclusion_df = temp[(temp["Layak_Target"] == 1) & (temp["status_target"] == 0)].copy().sort_values("F_IKR", ascending=True)
-                        inclusion_df = temp[(temp["Layak_Target"] == 0) & (temp["status_target"] == 1)].copy().sort_values("F_IKR", ascending=False)
+                        exclusion_df = temp[(temp["Layak_Target"] == 1) & (temp["status_target"] == 0)].copy().sort_values("IKR Agregat", ascending=True)
+                        inclusion_df = temp[(temp["Layak_Target"] == 0) & (temp["status_target"] == 1)].copy().sort_values("IKR Agregat", ascending=False)
 
                         c_ex, c_in = st.columns(2)
                         with c_ex:
@@ -5762,7 +7828,7 @@ if uploaded_file:
             )
             with subbab_dropdown("Within-Between Assortativity (Montes et al., 2018) dengan Kategori BPS 2014", expanded=False):
                 if "f_ikr_dari_rekap_kk" not in df_v.columns:
-                    st.warning("Kolom `f_ikr_dari_rekap_kk` tidak tersedia, sehingga audit Within-Between Montes belum dapat dihitung.")
+                    st.warning("Kolom IKR agregat tidak tersedia, sehingga audit Within-Between Montes belum dapat dihitung.")
                 else:
                     ikr_cat_lookup = (
                         df_v[["family_id", "kategori_ikr", "kategori_ikr_code"]]
@@ -5783,10 +7849,9 @@ if uploaded_file:
                         },
                     )
 
-                    cat_order = ["Sangat Tinggi", "Tinggi", "Sedang", "Rendah", "Tidak Valid"]
+                    cat_order = ordered_existing_categories(df_v["kategori_ikr"], BPS_CATEGORY_ORDER)
                     cat_dist = (
                         df_v["kategori_ikr"]
-                        .fillna("Tidak Valid")
                         .value_counts()
                         .reindex(cat_order, fill_value=0)
                         .rename_axis("Kategori BPS")
@@ -5797,7 +7862,10 @@ if uploaded_file:
                         (cat_dist["Jumlah KK"] / cat_dist["Jumlah KK"].sum()) * 100.0,
                         0.0,
                     )
-                    st.dataframe(cat_dist, use_container_width=True)
+                    if cat_dist.empty:
+                        st.info("Kategori BPS valid belum tersedia pada data desa terpilih.")
+                    else:
+                        st.dataframe(cat_dist, use_container_width=True)
 
                     montes_res = compute_montes_within_between_assortativity(
                         G,
@@ -5808,26 +7876,23 @@ if uploaded_file:
                     q_w_star = float(montes_res["q_w_star"])
                     q_b_star = float(montes_res["q_b_star"])
 
-                    st.markdown("##### Visual Graf Louvain dengan Pewarnaan Kategori BPS")
+                    st.markdown("##### Visual Jaringan Louvain dengan Pewarnaan Kategori BPS")
                     st.caption(
                         "Node mengikuti hasil graf Louvain yang sama, tetapi warna node kini ditempelkan berdasarkan "
                         "kategori BPS (`kategori_ikr`) agar pola stratifikasi lebih mudah dilihat sebelum membaca Qw* dan Qb*. "
                         f"Mode aktif mengikuti sidebar: `{graph_spatial_mode}`."
                     )
-                    if G.number_of_nodes() > 0:
+                    if G.number_of_nodes() > 0 and cat_order:
                         fig_montes_graph = go.Figure()
                         node_ids_montes = list(G.nodes())
                         if "pos_focus" in locals() and isinstance(pos_focus, dict) and len(pos_focus) == G.number_of_nodes():
                             pos_montes = pos_focus
                         else:
-                            n_nodes_layout_montes = max(G.number_of_nodes(), 2)
-                            layout_k_montes = float(np.clip(2.8 / np.sqrt(n_nodes_layout_montes), 0.22, 1.35))
-                            pos_montes = nx.spring_layout(
+                            pos_montes = build_clustered_network_layout(
                                 G,
+                                partition=partition,
+                                layout_spread=layout_spread if "layout_spread" in locals() else 2.2,
                                 seed=42,
-                                weight="weight",
-                                k=layout_k_montes,
-                                iterations=220,
                             )
 
                         edge_weights_montes = [
@@ -5837,19 +7902,22 @@ if uploaded_file:
                         edge_max_montes = float(max(edge_weights_montes)) if edge_weights_montes else 1.0
                         edge_span_montes = max(edge_max_montes - edge_min_montes, 1e-9)
 
-                        for u, v, d in G.edges(data=True):
-                            w = _safe_float_metric(d.get("weight"), default=0.0)
-                            w_norm = float((w - edge_min_montes) / edge_span_montes)
-                            fig_montes_graph.add_trace(
-                                go.Scatter(
-                                    x=[pos_montes[u][0], pos_montes[v][0], None],
-                                    y=[pos_montes[u][1], pos_montes[v][1], None],
-                                    mode="lines",
-                                    line=dict(width=0.8 + (2.0 * w_norm), color="rgba(148, 163, 184, 0.45)"),
-                                    hovertemplate=f"Interaksi: {w:.4f}<extra></extra>",
-                                    showlegend=False,
-                                )
-                            )
+                        visible_edges_montes = (
+                            visible_edges_focus
+                            if "visible_edges_focus" in locals()
+                            else select_representative_edges(G, max_edges=int(np.clip(G.number_of_nodes() * 1.45, 180, 950)), per_node=1)
+                        )
+                        add_network_edge_traces(
+                            fig_montes_graph,
+                            visible_edges_montes,
+                            pos_montes,
+                            edge_min_montes,
+                            edge_span_montes,
+                            color_fn=edge_color_by_interaction if "edge_color_by_interaction" in locals() else edge_color_by_weight,
+                            base_width=0.26,
+                            width_scale=0.72,
+                            hover=True,
+                        )
 
                         montes_hover_map = {
                             n: (
@@ -5857,7 +7925,7 @@ if uploaded_file:
                                 f"<br>family_id: {n}"
                                 f"<br>Kategori BPS: {G.nodes[n].get('kategori_ikr', 'Tidak Valid')}"
                                 f"<br>Kode BPS: {G.nodes[n].get('kategori_ikr_code', 0)}"
-                                f"<br>F_IKR: {_safe_float_metric(G.nodes[n].get('f_ikr_dari_rekap_kk'), default=np.nan):.3f}"
+                                f"<br>IKR Agregat: {_safe_float_metric(G.nodes[n].get('f_ikr_dari_rekap_kk'), default=np.nan):.3f}"
                                 f"<br>Klaster Louvain: {G.nodes[n].get('cluster', '-')}"
                             )
                             for n in node_ids_montes
@@ -5875,12 +7943,13 @@ if uploaded_file:
                                     x=[pos_montes[n][0] for n in cat_nodes],
                                     y=[pos_montes[n][1] for n in cat_nodes],
                                     mode="markers",
-                                    name=cat_label,
-                                    marker=dict(
-                                        size=12,
-                                        color=BPS_CATEGORY_COLORS.get(cat_label, "#94a3b8"),
-                                        line=dict(color="#0f172a", width=0.7),
-                                    ),
+                                        name=cat_label,
+                                        marker=dict(
+                                            size=node_size_main if "node_size_main" in locals() else network_marker_size(len(node_ids_montes), base=9.0),
+                                            color=BPS_CATEGORY_COLORS.get(cat_label, BPS_FALLBACK_COLOR),
+                                            opacity=0.86,
+                                            line=dict(color=NETWORK_NODE_LINE, width=node_line_width if "node_line_width" in locals() else 0.45),
+                                        ),
                                     text=[montes_hover_map[n] for n in cat_nodes],
                                     hoverinfo="text",
                                 )
@@ -5888,13 +7957,13 @@ if uploaded_file:
 
                         montes_hover_text = [montes_hover_map[n] for n in node_ids_montes]
 
+                        style_network_figure(
+                            fig_montes_graph,
+                            title="Jaringan Louvain Menurut Kategori BPS",
+                            height=660,
+                            showlegend=True,
+                        )
                         fig_montes_graph.update_layout(
-                            title="Graf Hasil Louvain: Warna Node Berdasarkan Kategori BPS",
-                            height=540,
-                            template="plotly_white",
-                            margin=dict(l=20, r=20, t=60, b=20),
-                            xaxis=dict(visible=False),
-                            yaxis=dict(visible=False),
                             legend=dict(
                                 orientation="h",
                                 yanchor="bottom",
@@ -5902,7 +7971,7 @@ if uploaded_file:
                                 xanchor="left",
                                 x=0.0,
                                 title="Kategori BPS",
-                            ),
+                            )
                         )
                         if graph_spatial_mode == "Layout Jaringan":
                             st.plotly_chart(fig_montes_graph, use_container_width=True, config=PLOTLY_DRAW_CONFIG)
@@ -5912,23 +7981,15 @@ if uploaded_file:
                                 category_to_idx.get(str(G.nodes[n].get("kategori_ikr", "Tidak Valid")).strip(), len(cat_order) - 1)
                                 for n in node_ids_montes
                             ]
-                            bps_colorscale = [
-                                [0.00, BPS_CATEGORY_COLORS["Sangat Tinggi"]],
-                                [0.24, BPS_CATEGORY_COLORS["Sangat Tinggi"]],
-                                [0.25, BPS_CATEGORY_COLORS["Tinggi"]],
-                                [0.49, BPS_CATEGORY_COLORS["Tinggi"]],
-                                [0.50, BPS_CATEGORY_COLORS["Sedang"]],
-                                [0.74, BPS_CATEGORY_COLORS["Sedang"]],
-                                [0.75, BPS_CATEGORY_COLORS["Rendah"]],
-                                [0.99, BPS_CATEGORY_COLORS["Rendah"]],
-                                [1.00, BPS_CATEGORY_COLORS["Tidak Valid"]],
-                            ]
+                            bps_colorscale = build_discrete_colorscale(
+                                [BPS_CATEGORY_COLORS.get(cat, BPS_FALLBACK_COLOR) for cat in cat_order]
+                            )
                             fig_montes_spatial = build_spatial_node_figure(
                                 G,
                                 node_ids=node_ids_montes,
                                 node_color_vals=montes_color_vals,
                                 node_hover_text=montes_hover_text,
-                                title="Graf Hasil Louvain Spasial: Warna Node Berdasarkan Kategori BPS",
+                                title="Sebaran Spasial Louvain Menurut Kategori BPS",
                                 spatial_mode=graph_spatial_mode,
                                 marker_size=12,
                                 colorscale=bps_colorscale,
@@ -5946,6 +8007,8 @@ if uploaded_file:
                             else:
                                 st.warning("Mode spasial aktif, tetapi kolom lat/lon belum valid. Ditampilkan mode layout jaringan.")
                                 st.plotly_chart(fig_montes_graph, use_container_width=True, config=PLOTLY_DRAW_CONFIG)
+                    elif not cat_order:
+                        st.info("Tidak ada kategori BPS valid untuk pewarnaan graf; visual kategori tidak ditampilkan.")
                     else:
                         st.info("Graf Louvain belum memiliki node yang cukup untuk divisualisasikan.")
 
@@ -5983,13 +8046,13 @@ if uploaded_file:
                         unsafe_allow_html=True,
                     )
 
-                    valid_cat_dist = cat_dist[cat_dist["Kategori BPS"] != "Tidak Valid"].copy()
+                    valid_cat_dist = cat_dist.copy()
                     if not valid_cat_dist.empty and valid_cat_dist["Jumlah KK"].sum() > 0:
                         dominant_idx = valid_cat_dist["Jumlah KK"].idxmax()
                         dominant_cat = str(valid_cat_dist.loc[dominant_idx, "Kategori BPS"])
                         dominant_share = float(valid_cat_dist.loc[dominant_idx, "Persentase (%)"])
                     else:
-                        dominant_cat = "Tidak Valid"
+                        dominant_cat = "Belum tersedia"
                         dominant_share = 0.0
 
                     if q_w_star >= 0.30 and q_b_star >= 0.30:
@@ -6029,7 +8092,7 @@ if uploaded_file:
                     st.plotly_chart(fig_montes, use_container_width=True, config=PLOTLY_DRAW_CONFIG)
 
                     st.caption(
-                        "Implementasi delta(x_i, x_j) menggunakan kategori BPS 2014 dari `f_ikr_dari_rekap_kk`; "
+                        "Implementasi delta(x_i, x_j) menggunakan kategori BPS 2014 dari IKR agregat; "
                         "delta(h_i, h_j) menggunakan keanggotaan klaster Louvain."
                     )
 

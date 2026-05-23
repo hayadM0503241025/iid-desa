@@ -54,10 +54,8 @@ RECOMMENDED_INDICATOR_WEIGHTS = {
         "indikator_partisipasi_kebijakan": 1 / 3,
     },
     "dimensi_lingkungan_sosial": {
-        "indikator_organisasi_kepala": 0.25,
-        "indikator_organisasi_anggota": 0.25,
-        "indikator_partisipasi_masyarakat_kepala": 0.25,
-        "indikator_partisipasi_masyarakat_anggota": 0.25,
+        "indikator_organisasi_rasio": 0.50,
+        "indikator_partisipasi_masyarakat_rasio": 0.50,
     },
 }
 
@@ -68,10 +66,8 @@ INDICATOR_OUTPUT_MAP = {
     "indikator_akses_internet": "indikator_D",
     "indikator_pendidikan_kepala": "indikator_E",
     "indikator_rasio_sekolah": "indikator_F",
-    "indikator_organisasi_kepala": "indikator_G",
-    "indikator_organisasi_anggota": "indikator_H",
-    "indikator_partisipasi_masyarakat_kepala": "indikator_I",
-    "indikator_partisipasi_masyarakat_anggota": "indikator_J",
+    "indikator_organisasi_rasio": "indikator_G",
+    "indikator_partisipasi_masyarakat_rasio": "indikator_H",
     "indikator_medsos": "indikator_K",
     "indikator_media_informasi": "indikator_L",
     "indikator_partisipasi_kebijakan": "indikator_M",
@@ -128,8 +124,6 @@ ADVANCED_ANALYSIS_DIMENSION_SPECS = (
         "indicator_specs": (
             ("indikator_G", "E1"),
             ("indikator_H", "E2"),
-            ("indikator_I", "E3"),
-            ("indikator_J", "E4"),
         ),
     },
 )
@@ -151,10 +145,41 @@ IID_RT_FIXED_CUTOFFS = (0.20, 0.40, 0.60, 0.80)
 UNSCORED_IID_CATEGORY_LABEL = "tanpa skor IID-RT"
 
 GINI_CATEGORY_ORDER = ["Rendah", "Sedang", "Tinggi"]
+ABSOLUTE_LOW_MODERATE_HIGH_RANGES = {
+    "Rendah": "<0,40",
+    "Sedang": "0,40-0,50",
+    "Tinggi": ">0,50",
+}
+ABSOLUTE_LOW_MODERATE_HIGH_BOUNDS = {
+    "Rendah": (0.0, 0.40),
+    "Sedang": (0.40, 0.50),
+    "Tinggi": (0.50, 1.0),
+}
+IID_DESA_ABSOLUTE_CATEGORY_ORDER = ["Rendah", "Sedang", "Tinggi", "Sangat Tinggi"]
+IID_DESA_ABSOLUTE_CATEGORY_RANGES = {
+    "Rendah": "<0,60",
+    "Sedang": ">=0,60-<0,70",
+    "Tinggi": ">=0,70-<0,80",
+    "Sangat Tinggi": ">=0,80",
+}
 GINI_INTERPRETATION_RULE_TEXT = (
-    "klasifikasi relatif berbasis tertil atas sebaran Gini antar desa dalam sampel; "
-    "33,3% desa dengan Gini terendah dikategorikan Rendah, 33,3% berikutnya Sedang, "
-    "dan 33,3% dengan Gini tertinggi dikategorikan Tinggi; tidak memakai ambang absolut"
+    "klasifikasi relatif berbasis tertil atas sebaran Gini IID-RT antar desa dalam sampel; "
+    "sepertiga desa dengan Gini terendah = Rendah, sepertiga berikutnya = Sedang, "
+    "dan sepertiga dengan Gini tertinggi = Tinggi"
+)
+IKD_INTERPRETATION_RULE_TEXT = (
+    "klasifikasi relatif berbasis tertil atas sebaran IKD-Desa dalam sampel; "
+    "sepertiga desa dengan IKD terendah = Rendah, sepertiga berikutnya = Sedang, "
+    "dan sepertiga dengan IKD tertinggi = Tinggi"
+)
+DDS_RULE_TEXT = (
+    "((1 - iid_desa) + gini_iid_rumah_tangga) / 2; pembagi 2 digunakan karena dua komponen "
+    "digabungkan dengan bobot sama, yaitu 50% rendahnya inklusi digital dan 50% ketimpangan digital internal desa"
+)
+DDS_INTERPRETATION_RULE_TEXT = (
+    "klasifikasi relatif berbasis tertil atas sebaran dds_desa dalam sampel; "
+    "sepertiga desa dengan DDS terendah = Rendah, sepertiga berikutnya = Sedang, "
+    "dan sepertiga dengan DDS tertinggi = Tinggi"
 )
 
 EXCEL_FLOAT_FORMAT = "0.######"
@@ -617,6 +642,191 @@ def classify_iid_rt(value: object) -> object:
     return "sangat tinggi"
 
 
+def classify_iid_desa_absolute(value: object) -> object:
+    if pd.isna(value):
+        return pd.NA
+    score = float(value)
+    if score >= 0.80:
+        return "Sangat Tinggi"
+    if score >= 0.70:
+        return "Tinggi"
+    if score >= 0.60:
+        return "Sedang"
+    return "Rendah"
+
+
+def classify_low_moderate_high_absolute(value: object) -> object:
+    if pd.isna(value):
+        return pd.NA
+    score = float(value)
+    if score < 0.40:
+        return "Rendah"
+    if score <= 0.50:
+        return "Sedang"
+    return "Tinggi"
+
+
+def classify_gini_absolute(value: object) -> object:
+    return classify_low_moderate_high_absolute(value)
+
+
+def classify_ikd_desa_absolute(value: object) -> object:
+    return classify_low_moderate_high_absolute(value)
+
+
+def compute_digital_deprivation_within_inequality_score(desa_summary: pd.DataFrame) -> pd.Series:
+    if desa_summary.empty:
+        return pd.Series(dtype=float)
+
+    if "ikd_desa" in desa_summary.columns:
+        deprivation_component = pd.to_numeric(desa_summary["ikd_desa"], errors="coerce")
+    elif "iid_desa" in desa_summary.columns:
+        deprivation_component = 1 - pd.to_numeric(desa_summary["iid_desa"], errors="coerce")
+    else:
+        deprivation_component = pd.Series(np.nan, index=desa_summary.index, dtype=float)
+
+    if "gini_iid_rumah_tangga" in desa_summary.columns:
+        inequality_component = pd.to_numeric(desa_summary["gini_iid_rumah_tangga"], errors="coerce")
+    else:
+        inequality_component = pd.Series(np.nan, index=desa_summary.index, dtype=float)
+
+    return ((deprivation_component.clip(lower=0, upper=1) + inequality_component.clip(lower=0, upper=1)) / 2).clip(
+        lower=0,
+        upper=1,
+    )
+
+
+def apply_absolute_low_moderate_high_classification(
+    desa_summary: pd.DataFrame,
+    value_column: str,
+    category_column: str,
+    range_column: str,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    output_columns = [
+        category_column,
+        range_column,
+        "jumlah_desa",
+        "persentase_desa",
+        "total_desa",
+        "batas_bawah",
+        "batas_atas",
+    ]
+    if desa_summary.empty or value_column not in desa_summary.columns:
+        empty_summary = pd.DataFrame(columns=output_columns)
+        enriched_df = desa_summary.copy()
+        if category_column not in enriched_df.columns:
+            enriched_df[category_column] = pd.NA
+        return enriched_df, empty_summary
+
+    enriched_df = desa_summary.copy()
+    enriched_df[value_column] = pd.to_numeric(enriched_df[value_column], errors="coerce")
+    enriched_df[category_column] = enriched_df[value_column].map(classify_low_moderate_high_absolute)
+
+    valid_count = int(enriched_df[value_column].notna().sum())
+    category_rows: list[dict[str, object]] = []
+    for label in GINI_CATEGORY_ORDER:
+        category_values = enriched_df.loc[
+            enriched_df[category_column].astype("string").eq(label),
+            value_column,
+        ].dropna()
+        jumlah_desa = int(category_values.shape[0])
+        batas_bawah, batas_atas = ABSOLUTE_LOW_MODERATE_HIGH_BOUNDS[label]
+
+        category_rows.append(
+            {
+                category_column: label,
+                range_column: ABSOLUTE_LOW_MODERATE_HIGH_RANGES[label],
+                "jumlah_desa": jumlah_desa,
+                "persentase_desa": (jumlah_desa / valid_count) if valid_count > 0 else 0.0,
+                "total_desa": valid_count,
+                "batas_bawah": batas_bawah,
+                "batas_atas": batas_atas,
+            }
+        )
+
+    return enriched_df, pd.DataFrame(category_rows, columns=output_columns)
+
+
+def apply_relative_low_moderate_high_classification(
+    desa_summary: pd.DataFrame,
+    value_column: str,
+    category_column: str,
+    range_column: str,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    output_columns = [
+        category_column,
+        range_column,
+        "jumlah_desa",
+        "persentase_desa",
+        "total_desa",
+        "batas_bawah",
+        "batas_atas",
+    ]
+    if desa_summary.empty or value_column not in desa_summary.columns:
+        empty_summary = pd.DataFrame(columns=output_columns)
+        enriched_df = desa_summary.copy()
+        if category_column not in enriched_df.columns:
+            enriched_df[category_column] = pd.NA
+        return enriched_df, empty_summary
+
+    enriched_df = desa_summary.copy()
+    enriched_df[value_column] = pd.to_numeric(enriched_df[value_column], errors="coerce")
+    enriched_df[category_column] = pd.Series(pd.NA, index=enriched_df.index, dtype="object")
+
+    valid_mask = enriched_df[value_column].notna()
+    valid_count = int(valid_mask.sum())
+    if valid_count > 0:
+        tertile_count = min(3, valid_count)
+        labels = GINI_CATEGORY_ORDER[:tertile_count]
+        ranked_values = enriched_df.loc[valid_mask, value_column].rank(method="first")
+        category_values = pd.qcut(ranked_values, q=tertile_count, labels=labels)
+        enriched_df.loc[valid_mask, category_column] = category_values.astype("string").tolist()
+
+    category_rows: list[dict[str, object]] = []
+    for label in GINI_CATEGORY_ORDER:
+        category_values = enriched_df.loc[
+            enriched_df[category_column].astype("string").eq(label),
+            value_column,
+        ].dropna()
+        jumlah_desa = int(category_values.shape[0])
+        batas_bawah = float(category_values.min()) if not category_values.empty else np.nan
+        batas_atas = float(category_values.max()) if not category_values.empty else np.nan
+
+        if category_values.empty:
+            range_value = pd.NA
+        elif label == GINI_CATEGORY_ORDER[0]:
+            range_value = f"<= {format_gini_range_value(batas_atas)}"
+        elif label == GINI_CATEGORY_ORDER[-1]:
+            range_value = f">= {format_gini_range_value(batas_bawah)}"
+        else:
+            range_value = f"{format_gini_range_value(batas_bawah)} - {format_gini_range_value(batas_atas)}"
+
+        category_rows.append(
+            {
+                category_column: label,
+                range_column: range_value,
+                "jumlah_desa": jumlah_desa,
+                "persentase_desa": (jumlah_desa / valid_count) if valid_count > 0 else 0.0,
+                "total_desa": valid_count,
+                "batas_bawah": batas_bawah,
+                "batas_atas": batas_atas,
+            }
+        )
+
+    return enriched_df, pd.DataFrame(category_rows, columns=output_columns)
+
+
+def apply_relative_ikd_classification(
+    desa_summary: pd.DataFrame,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    return apply_relative_low_moderate_high_classification(
+        desa_summary,
+        value_column="ikd_desa",
+        category_column="interpretasi_ikd_desa",
+        range_column="rentang_ikd_desa",
+    )
+
+
 def format_gini_range_value(value: object, digits: int = 5) -> str:
     if pd.isna(value):
         return ""
@@ -626,104 +836,48 @@ def format_gini_range_value(value: object, digits: int = 5) -> str:
 def apply_relative_gini_classification(
     desa_summary: pd.DataFrame,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
-    output_columns = [
-        "interpretasi_gini",
-        "rentang_gini",
-        "jumlah_desa",
-        "persentase_desa",
-        "total_desa",
-        "batas_bawah",
-        "batas_atas",
-    ]
-    if desa_summary.empty or "gini_iid_rumah_tangga" not in desa_summary.columns:
-        empty_summary = pd.DataFrame(columns=output_columns)
-        enriched_df = desa_summary.copy()
-        if "interpretasi_gini" not in enriched_df.columns:
-            enriched_df["interpretasi_gini"] = pd.NA
-        return enriched_df, empty_summary
+    return apply_relative_low_moderate_high_classification(
+        desa_summary,
+        value_column="gini_iid_rumah_tangga",
+        category_column="interpretasi_gini",
+        range_column="rentang_gini",
+    )
 
-    enriched_df = desa_summary.copy()
-    enriched_df["gini_iid_rumah_tangga"] = pd.to_numeric(enriched_df["gini_iid_rumah_tangga"], errors="coerce")
-    enriched_df["interpretasi_gini"] = pd.Series(pd.NA, index=enriched_df.index, dtype="object")
 
-    valid_mask = enriched_df["gini_iid_rumah_tangga"].notna()
-    valid_count = int(valid_mask.sum())
-    if valid_count > 0:
-        tertile_count = min(3, valid_count)
-        labels = GINI_CATEGORY_ORDER[:tertile_count]
-        ranked_values = enriched_df.loc[valid_mask, "gini_iid_rumah_tangga"].rank(method="first")
-        category_values = pd.qcut(ranked_values, q=tertile_count, labels=labels)
-        enriched_df.loc[valid_mask, "interpretasi_gini"] = category_values.astype("string").tolist()
-
-    total_desa = int(valid_count)
-    category_rows: list[dict[str, object]] = []
-    for label in GINI_CATEGORY_ORDER:
-        category_values = enriched_df.loc[
-            enriched_df["interpretasi_gini"].astype("string").eq(label),
-            "gini_iid_rumah_tangga",
-        ].dropna()
-        jumlah_desa = int(category_values.shape[0])
-        batas_bawah = float(category_values.min()) if not category_values.empty else np.nan
-        batas_atas = float(category_values.max()) if not category_values.empty else np.nan
-
-        if category_values.empty:
-            rentang_gini = pd.NA
-        elif label == GINI_CATEGORY_ORDER[0]:
-            rentang_gini = f"<= {format_gini_range_value(batas_atas)}"
-        elif label == GINI_CATEGORY_ORDER[-1]:
-            rentang_gini = f">= {format_gini_range_value(batas_bawah)}"
-        else:
-            rentang_gini = f"{format_gini_range_value(batas_bawah)} - {format_gini_range_value(batas_atas)}"
-
-        category_rows.append(
-            {
-                "interpretasi_gini": label,
-                "rentang_gini": rentang_gini,
-                "jumlah_desa": jumlah_desa,
-                "persentase_desa": (jumlah_desa / total_desa) if total_desa > 0 else 0.0,
-                "total_desa": total_desa,
-                "batas_bawah": batas_bawah,
-                "batas_atas": batas_atas,
-            }
-        )
-
-    return enriched_df, pd.DataFrame(category_rows, columns=output_columns)
+def apply_relative_dds_classification(
+    desa_summary: pd.DataFrame,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    return apply_relative_low_moderate_high_classification(
+        desa_summary,
+        value_column="dds_desa",
+        category_column="interpretasi_dds_desa",
+        range_column="rentang_dds_desa",
+    )
 
 
 def interpret_gini_value(value: object, gini_distribution_df: pd.DataFrame) -> object:
-    if pd.isna(value) or gini_distribution_df.empty:
+    if pd.isna(value):
+        return pd.NA
+    required_columns = {"interpretasi_gini", "batas_atas"}
+    if gini_distribution_df.empty or not required_columns.issubset(gini_distribution_df.columns):
         return pd.NA
 
     score = float(value)
-    lookup_df = gini_distribution_df.copy()
-    for column in ("jumlah_desa", "batas_bawah", "batas_atas"):
-        if column in lookup_df.columns:
-            lookup_df[column] = pd.to_numeric(lookup_df[column], errors="coerce")
-    lookup_df = lookup_df.loc[lookup_df["jumlah_desa"].fillna(0).gt(0)].copy()
-    if lookup_df.empty:
+    distribution_df = gini_distribution_df.copy()
+    distribution_df["batas_atas"] = pd.to_numeric(distribution_df["batas_atas"], errors="coerce")
+    if "batas_bawah" in distribution_df.columns:
+        distribution_df["batas_bawah"] = pd.to_numeric(distribution_df["batas_bawah"], errors="coerce")
+        distribution_df = distribution_df.sort_values(["batas_bawah", "batas_atas"], na_position="last", kind="mergesort")
+    else:
+        distribution_df = distribution_df.sort_values("batas_atas", na_position="last", kind="mergesort")
+    distribution_df = distribution_df.dropna(subset=["interpretasi_gini", "batas_atas"])
+    if distribution_df.empty:
         return pd.NA
 
-    low_row = lookup_df.loc[lookup_df["interpretasi_gini"].astype("string").eq(GINI_CATEGORY_ORDER[0])].head(1)
-    high_row = lookup_df.loc[lookup_df["interpretasi_gini"].astype("string").eq(GINI_CATEGORY_ORDER[-1])].head(1)
-    middle_row = lookup_df.loc[lookup_df["interpretasi_gini"].astype("string").eq(GINI_CATEGORY_ORDER[1])].head(1)
-
-    if not low_row.empty:
-        low_upper = low_row["batas_atas"].iloc[0]
-        if pd.notna(low_upper) and score <= float(low_upper):
-            return GINI_CATEGORY_ORDER[0]
-
-    if not high_row.empty:
-        high_lower = high_row["batas_bawah"].iloc[0]
-        if pd.notna(high_lower) and score >= float(high_lower):
-            return GINI_CATEGORY_ORDER[-1]
-
-    if not middle_row.empty:
-        return GINI_CATEGORY_ORDER[1]
-    if not high_row.empty:
-        return GINI_CATEGORY_ORDER[-1]
-    if not low_row.empty:
-        return GINI_CATEGORY_ORDER[0]
-    return pd.NA
+    for row in distribution_df.itertuples(index=False):
+        if score <= float(row.batas_atas):
+            return row.interpretasi_gini
+    return distribution_df["interpretasi_gini"].iloc[-1]
 
 
 def normalize_household_gini_frame(household_df: pd.DataFrame) -> pd.DataFrame:
@@ -1062,11 +1216,18 @@ def build_household_index(
     df["is_head"] = build_head_mask(df)
     df["usia_num"] = pd.to_numeric(df["usia"], errors="coerce")
     df["partisipasi_sekolah_norm"] = normalize_text_series(df["partisipasi_sekolah"])
+    df["hp_punya_norm"] = normalize_text_series(df["hp_punya"])
+    df["hp_jumlah_num_person"] = pd.to_numeric(df["hp_jumlah"], errors="coerce").clip(lower=0)
+    df["anggota_memiliki_hp"] = (
+        df["hp_punya_norm"].isin(YES_VALUES) | df["hp_jumlah_num_person"].fillna(0).gt(0)
+    )
     df["jumlah_isian_organisasi"] = df.apply(
         lambda row: count_combined_multivalue_items(row["par_organisasi"], row["organisasi_nama"]),
         axis=1,
     )
     df["jumlah_isian_masyarakat"] = df["par_masyarakat"].apply(count_multivalue_items)
+    df["anggota_ikut_organisasi"] = df["jumlah_isian_organisasi"].gt(0)
+    df["anggota_ikut_masyarakat"] = df["jumlah_isian_masyarakat"].gt(0)
     df["jumlah_kebijakan_ya"] = normalize_text_series(df["par_kebijakan"]).isin(YES_VALUES).astype(int)
 
     df_sorted = df.sort_values(["family_id", "is_head"], ascending=[True, False], kind="mergesort")
@@ -1104,6 +1265,45 @@ def build_household_index(
         .rename("jumlah_anggota_sedang_sekolah")
         .reindex(preferred_row.index, fill_value=0)
     )
+    hp_eligible_mask = df["usia_num"].ge(15)
+    hp_eligible_total = (
+        df.loc[hp_eligible_mask, "family_id"]
+        .value_counts(sort=False)
+        .rename("jumlah_anggota_usia_15plus")
+        .reindex(preferred_row.index, fill_value=0)
+    )
+    hp_owner_total = (
+        df.loc[hp_eligible_mask & df["anggota_memiliki_hp"], "family_id"]
+        .value_counts(sort=False)
+        .rename("jumlah_anggota_usia_15plus_memiliki_hp")
+        .reindex(preferred_row.index, fill_value=0)
+    )
+    organisasi_eligible_mask = df["usia_num"].ge(9)
+    organisasi_eligible_total = (
+        df.loc[organisasi_eligible_mask, "family_id"]
+        .value_counts(sort=False)
+        .rename("jumlah_anggota_usia_9plus")
+        .reindex(preferred_row.index, fill_value=0)
+    )
+    organisasi_participant_total = (
+        df.loc[organisasi_eligible_mask & df["anggota_ikut_organisasi"], "family_id"]
+        .value_counts(sort=False)
+        .rename("jumlah_anggota_usia_9plus_ikut_organisasi")
+        .reindex(preferred_row.index, fill_value=0)
+    )
+    masyarakat_eligible_mask = df["usia_num"].ge(16)
+    masyarakat_eligible_total = (
+        df.loc[masyarakat_eligible_mask, "family_id"]
+        .value_counts(sort=False)
+        .rename("jumlah_anggota_usia_16plus")
+        .reindex(preferred_row.index, fill_value=0)
+    )
+    masyarakat_participant_total = (
+        df.loc[masyarakat_eligible_mask & df["anggota_ikut_masyarakat"], "family_id"]
+        .value_counts(sort=False)
+        .rename("jumlah_anggota_usia_16plus_ikut_masyarakat")
+        .reindex(preferred_row.index, fill_value=0)
+    )
     wifi_items = df.groupby("family_id", dropna=False)["wifi"].apply(collect_multivalue_items).reindex(preferred_row.index)
     provider_items = (
         df.groupby("family_id", dropna=False)["hp_provider"].apply(collect_multivalue_items).reindex(preferred_row.index)
@@ -1123,30 +1323,14 @@ def build_household_index(
         .reindex(preferred_row.index, fill_value=0)
         .astype(int)
     )
-    organisasi_kepala_count = (
-        df.loc[df["is_head"]]
-        .groupby("family_id")["jumlah_isian_organisasi"]
+    organisasi_total_count = (
+        df.groupby("family_id")["jumlah_isian_organisasi"]
         .sum()
         .reindex(preferred_row.index, fill_value=0)
         .astype(int)
     )
-    organisasi_anggota_count = (
-        df.loc[~df["is_head"]]
-        .groupby("family_id")["jumlah_isian_organisasi"]
-        .sum()
-        .reindex(preferred_row.index, fill_value=0)
-        .astype(int)
-    )
-    masyarakat_kepala_count = (
-        df.loc[df["is_head"]]
-        .groupby("family_id")["jumlah_isian_masyarakat"]
-        .sum()
-        .reindex(preferred_row.index, fill_value=0)
-        .astype(int)
-    )
-    masyarakat_anggota_count = (
-        df.loc[~df["is_head"]]
-        .groupby("family_id")["jumlah_isian_masyarakat"]
+    masyarakat_total_count = (
+        df.groupby("family_id")["jumlah_isian_masyarakat"]
         .sum()
         .reindex(preferred_row.index, fill_value=0)
         .astype(int)
@@ -1193,6 +1377,12 @@ def build_household_index(
     household_df["jumlah_anggota_usia_sekolah"] = school_total.astype(int)
     household_df["jumlah_status_sekolah_terisi"] = school_known.astype(int)
     household_df["jumlah_anggota_sedang_sekolah"] = school_in_school.astype(int)
+    household_df["jumlah_anggota_usia_15plus"] = hp_eligible_total.astype(int)
+    household_df["jumlah_anggota_usia_15plus_memiliki_hp"] = hp_owner_total.astype(int)
+    household_df["jumlah_anggota_usia_9plus"] = organisasi_eligible_total.astype(int)
+    household_df["jumlah_anggota_usia_9plus_ikut_organisasi"] = organisasi_participant_total.astype(int)
+    household_df["jumlah_anggota_usia_16plus"] = masyarakat_eligible_total.astype(int)
+    household_df["jumlah_anggota_usia_16plus_ikut_masyarakat"] = masyarakat_participant_total.astype(int)
 
     household_df["deskel"] = household_df["deskel"].astype("string").str.strip()
     household_df["deskel_std"] = normalize_text_series(household_df["deskel"]).replace({"": pd.NA})
@@ -1216,10 +1406,12 @@ def build_household_index(
     )
     household_df["indikator_hp_dimiliki"] = household_df["hp_jumlah_terstandar"].apply(score_binary_presence)
 
-    household_df["rasio_hp_terhadap_anggota"] = (
-        household_df["hp_jumlah_terstandar"] / household_df["jumlah_anggota_rumah_tangga"].replace(0, np.nan)
+    household_df["rasio_hp_berlaku"] = household_df["jumlah_anggota_usia_15plus"].gt(0)
+    household_df["rasio_hp_usia_15plus"] = (
+        household_df["jumlah_anggota_usia_15plus_memiliki_hp"]
+        / household_df["jumlah_anggota_usia_15plus"].replace(0, np.nan)
     ).clip(lower=0, upper=1)
-    household_df["indikator_kecukupan_hp"] = household_df["rasio_hp_terhadap_anggota"].astype(float)
+    household_df["indikator_kecukupan_hp"] = household_df["rasio_hp_usia_15plus"].astype(float)
 
     household_df["jumlah_perangkat_produktif_rumah_tangga"] = household_df["elektronik_rumah"].apply(
         lambda value: count_keyword_matches(value, DIGITAL_PRODUCTIVE_DEVICE_KEYWORDS)
@@ -1253,18 +1445,22 @@ def build_household_index(
     ).clip(lower=0, upper=1)
     household_df.loc[valid_school_ratio_mask, "indikator_rasio_sekolah"] = school_ratio.loc[valid_school_ratio_mask]
 
-    household_df["jumlah_organisasi_kepala"] = organisasi_kepala_count
-    household_df["jumlah_organisasi_anggota"] = organisasi_anggota_count
-    household_df["jumlah_partisipasi_masyarakat_kepala"] = masyarakat_kepala_count
-    household_df["jumlah_partisipasi_masyarakat_anggota"] = masyarakat_anggota_count
-    household_df["indikator_organisasi_kepala"] = household_df["jumlah_organisasi_kepala"].apply(score_zero_one_many)
-    household_df["indikator_organisasi_anggota"] = household_df["jumlah_organisasi_anggota"].apply(score_zero_one_many)
-    household_df["indikator_partisipasi_masyarakat_kepala"] = household_df["jumlah_partisipasi_masyarakat_kepala"].apply(
-        score_zero_one_many
-    )
-    household_df["indikator_partisipasi_masyarakat_anggota"] = household_df["jumlah_partisipasi_masyarakat_anggota"].apply(
-        score_zero_one_many
-    )
+    household_df["jumlah_organisasi_keluarga"] = organisasi_total_count
+    household_df["jumlah_partisipasi_masyarakat_keluarga"] = masyarakat_total_count
+    household_df["rasio_organisasi_berlaku"] = household_df["jumlah_anggota_usia_9plus"].gt(0)
+    household_df["rasio_partisipasi_masyarakat_berlaku"] = household_df["jumlah_anggota_usia_16plus"].gt(0)
+    household_df["rasio_organisasi_usia_9plus"] = (
+        household_df["jumlah_anggota_usia_9plus_ikut_organisasi"]
+        / household_df["jumlah_anggota_usia_9plus"].replace(0, np.nan)
+    ).clip(lower=0, upper=1)
+    household_df["rasio_partisipasi_masyarakat_usia_16plus"] = (
+        household_df["jumlah_anggota_usia_16plus_ikut_masyarakat"]
+        / household_df["jumlah_anggota_usia_16plus"].replace(0, np.nan)
+    ).clip(lower=0, upper=1)
+    household_df["indikator_organisasi_rasio"] = household_df["rasio_organisasi_usia_9plus"].astype(float)
+    household_df["indikator_partisipasi_masyarakat_rasio"] = household_df[
+        "rasio_partisipasi_masyarakat_usia_16plus"
+    ].astype(float)
     household_df["medsos_teragregasi"] = medsos_items.apply(lambda values: ",".join(values) if values else pd.NA)
     household_df["media_informasi_teragregasi"] = media_informasi_items.apply(
         lambda values: ",".join(values) if values else pd.NA
@@ -1280,10 +1476,8 @@ def build_household_index(
         "indikator_perangkat_produktif",
         "indikator_akses_internet",
         "indikator_pendidikan_kepala",
-        "indikator_organisasi_kepala",
-        "indikator_organisasi_anggota",
-        "indikator_partisipasi_masyarakat_kepala",
-        "indikator_partisipasi_masyarakat_anggota",
+        "indikator_organisasi_rasio",
+        "indikator_partisipasi_masyarakat_rasio",
         "indikator_medsos",
         "indikator_media_informasi",
         "indikator_partisipasi_kebijakan",
@@ -1292,10 +1486,25 @@ def build_household_index(
 
     applicable_indicator_count = pd.Series(len(core_indicator_cols), index=household_df.index, dtype=float)
     applicable_indicator_count = applicable_indicator_count - (~household_df["rasio_sekolah_berlaku"]).astype(int)
+    applicable_indicator_count = applicable_indicator_count - (~household_df["rasio_hp_berlaku"]).astype(int)
+    applicable_indicator_count = applicable_indicator_count - (~household_df["rasio_organisasi_berlaku"]).astype(int)
+    applicable_indicator_count = applicable_indicator_count - (
+        ~household_df["rasio_partisipasi_masyarakat_berlaku"]
+    ).astype(int)
 
     missing_core_count = household_df[scored_indicator_cols].isna().sum(axis=1)
     missing_core_count = missing_core_count + (
         household_df["indikator_rasio_sekolah"].isna() & household_df["rasio_sekolah_berlaku"]
+    ).astype(int)
+    missing_core_count = missing_core_count - (
+        household_df["indikator_kecukupan_hp"].isna() & ~household_df["rasio_hp_berlaku"]
+    ).astype(int)
+    missing_core_count = missing_core_count - (
+        household_df["indikator_organisasi_rasio"].isna() & ~household_df["rasio_organisasi_berlaku"]
+    ).astype(int)
+    missing_core_count = missing_core_count - (
+        household_df["indikator_partisipasi_masyarakat_rasio"].isna()
+        & ~household_df["rasio_partisipasi_masyarakat_berlaku"]
     ).astype(int)
 
     household_df["proporsi_indikator_inti_hilang"] = (missing_core_count / applicable_indicator_count.replace(0, np.nan)).fillna(0)
@@ -1324,10 +1533,18 @@ def build_household_index(
     valid_df = household_df.loc[household_df["valid_untuk_indeks"]].copy()
 
     imputation_summary: list[dict[str, object]] = []
+    indicator_applicable_masks = {
+        "indikator_kecukupan_hp": valid_df["rasio_hp_berlaku"],
+        "indikator_organisasi_rasio": valid_df["rasio_organisasi_berlaku"],
+        "indikator_partisipasi_masyarakat_rasio": valid_df["rasio_partisipasi_masyarakat_berlaku"],
+    }
     for column in scored_indicator_cols:
-        missing_before = int(valid_df[column].isna().sum())
-        fill_value = float(valid_df[column].mode(dropna=True).iloc[0]) if valid_df[column].notna().any() else 0.0
-        valid_df[column] = valid_df[column].fillna(fill_value)
+        applicable_mask = indicator_applicable_masks.get(column, pd.Series(True, index=valid_df.index))
+        missing_mask = valid_df[column].isna() & applicable_mask
+        missing_before = int(missing_mask.sum())
+        applicable_values = valid_df.loc[applicable_mask, column]
+        fill_value = float(applicable_values.mode(dropna=True).iloc[0]) if applicable_values.notna().any() else 0.0
+        valid_df.loc[missing_mask, column] = fill_value
         imputation_summary.append(
             {"indikator": column, "tipe_imputasi": "modus", "nilai_imputasi": fill_value, "jumlah_diimputasi": missing_before}
         )
@@ -1365,10 +1582,8 @@ def build_household_index(
     valid_df["dimensi_lingkungan_sosial"] = compute_dimension_mean(
         valid_df,
         [
-            "indikator_organisasi_kepala",
-            "indikator_organisasi_anggota",
-            "indikator_partisipasi_masyarakat_kepala",
-            "indikator_partisipasi_masyarakat_anggota",
+            "indikator_organisasi_rasio",
+            "indikator_partisipasi_masyarakat_rasio",
         ],
     )
 
@@ -1474,10 +1689,8 @@ def build_keluarga_output(
         "indikator_perangkat_produktif",
         "indikator_akses_internet",
         "indikator_pendidikan_kepala",
-        "indikator_organisasi_kepala",
-        "indikator_organisasi_anggota",
-        "indikator_partisipasi_masyarakat_kepala",
-        "indikator_partisipasi_masyarakat_anggota",
+        "indikator_organisasi_rasio",
+        "indikator_partisipasi_masyarakat_rasio",
         "indikator_medsos",
         "indikator_media_informasi",
         "indikator_partisipasi_kebijakan",
@@ -1552,7 +1765,11 @@ def build_desa_summary(household_master: pd.DataFrame) -> pd.DataFrame:
     desa_summary["ikd_desa"] = 1 - desa_summary["iid_desa"]
     desa_summary["ikd_desa"] = desa_summary["ikd_desa"].clip(lower=0, upper=1)
     desa_summary["gini_iid_rumah_tangga"] = desa_summary["gini_iid_rumah_tangga"].clip(lower=0, upper=1)
+    desa_summary["dds_desa"] = compute_digital_deprivation_within_inequality_score(desa_summary)
+    desa_summary["interpretasi_iid_desa"] = desa_summary["iid_desa"].apply(classify_iid_desa_absolute)
     desa_summary, _ = apply_relative_gini_classification(desa_summary)
+    desa_summary, _ = apply_relative_ikd_classification(desa_summary)
+    desa_summary, _ = apply_relative_dds_classification(desa_summary)
 
     rename_map = {
         **INDICATOR_OUTPUT_MAP,
@@ -1568,9 +1785,13 @@ def build_desa_summary(household_master: pd.DataFrame) -> pd.DataFrame:
         *INDICATOR_OUTPUT_MAP.values(),
         *DIMENSION_OUTPUT_MAP.values(),
         "iid_desa",
+        "interpretasi_iid_desa",
         "ikd_desa",
+        "interpretasi_ikd_desa",
         "gini_iid_rumah_tangga",
         "interpretasi_gini",
+        "dds_desa",
+        "interpretasi_dds_desa",
     ]
     ordered_columns = [col for col in ordered_columns if col in desa_summary.columns]
     desa_summary = desa_summary.loc[:, ordered_columns]
@@ -2386,10 +2607,10 @@ def add_gini_visualization_to_indeks_desa(workbook: object, gini_distribution_df
     title_cell.fill = title_fill
 
     worksheet["A2"] = (
-        "Pie chart menunjukkan proporsi desa pada tiap kategori relatif ketimpangan, sedangkan diagram batang menunjukkan jumlah desanya."
+        "Pie chart menunjukkan proporsi desa pada tiap kategori tertil ketimpangan, sedangkan diagram batang menunjukkan jumlah desanya."
     )
     worksheet["A3"] = (
-        "Karena seluruh Gini desa berada pada rentang rendah secara absolut, interpretasi memakai tertil relatif antar desa dalam sampel: sepertiga desa dengan Gini terendah = Rendah, sepertiga berikutnya = Sedang, dan sepertiga tertinggi = Tinggi."
+        "Interpretasi Gini memakai tertil relatif antar desa: sepertiga nilai terendah = Rendah, sepertiga tengah = Sedang, sepertiga tertinggi = Tinggi."
     )
     worksheet["A2"].alignment = wrap_alignment
     worksheet["A3"].alignment = wrap_alignment
@@ -2414,7 +2635,7 @@ def add_gini_visualization_to_indeks_desa(workbook: object, gini_distribution_df
         value=f"{dominant_row['interpretasi_gini']} ({dominant_row['rentang_gini']})",
     ).alignment = wrap_alignment
 
-    headers = ["Kategori Relatif", "Rentang Gini", "Jumlah Desa", "% dari total desa"]
+    headers = ["Kategori Tertil", "Rentang Gini", "Jumlah Desa", "% dari total desa"]
     header_row = 5
     for offset, header in enumerate(headers):
         header_cell = worksheet.cell(row=header_row, column=1 + offset, value=header)
@@ -2445,7 +2666,7 @@ def add_gini_visualization_to_indeks_desa(workbook: object, gini_distribution_df
     )
 
     pie_chart = PieChart()
-    pie_chart.title = "Sebaran Kategori Relatif Gini Antar Desa"
+    pie_chart.title = "Sebaran Kategori Tertil Gini Antar Desa"
     pie_chart.height = 8
     pie_chart.width = 10
     pie_chart.varyColors = True
@@ -2460,7 +2681,7 @@ def add_gini_visualization_to_indeks_desa(workbook: object, gini_distribution_df
     bar_chart = BarChart()
     bar_chart.type = "col"
     bar_chart.style = 10
-    bar_chart.title = "Jumlah Desa per Kategori Relatif Gini"
+    bar_chart.title = "Jumlah Desa per Kategori Tertil Gini"
     bar_chart.y_axis.title = "Jumlah Desa"
     bar_chart.x_axis.title = "Kategori Ketimpangan"
     bar_chart.height = 8
@@ -2482,8 +2703,9 @@ def add_gini_visualization_to_indeks_desa(workbook: object, gini_distribution_df
         row=detail_start_row + 1,
         column=1,
         value=(
-            "Klasifikasi ini bersifat relatif di dalam sampel penelitian. Jadi label Rendah, Sedang, dan Tinggi menunjukkan posisi ketimpangan antar desa, "
-            "bukan ambang absolut seperti 0,30 atau 0,50."
+            "Klasifikasi ini memakai tertil relatif atas sebaran koefisien Gini IID-RT antar desa dalam sampel. "
+            "Kategori Rendah berisi sepertiga desa dengan Gini terendah, Sedang berisi sepertiga berikutnya, "
+            "dan Tinggi berisi sepertiga desa dengan Gini tertinggi."
         ),
     ).alignment = wrap_alignment
 
@@ -2833,12 +3055,12 @@ def build_variable_explanation(
         {
             "nama_variabel": "indikator_B",
             "level_output": "keluarga, desa",
-            "label_konsep": "Kecukupan HP",
+            "label_konsep": "Kecukupan HP anggota usia 15 tahun ke atas",
             "dimensi": "Akses perangkat",
             "simbol_dimensi": "A_h",
             "bobot_dimensi": 0.25,
-            "sumber_nilai": "hp_jumlah, jml_keluarga",
-            "aturan_skoring": "min(hp_jumlah / jumlah anggota keluarga, 1)",
+            "sumber_nilai": "usia, hp_punya, hp_jumlah",
+            "aturan_skoring": "jumlah anggota keluarga usia >=15 yang memiliki HP / jumlah anggota keluarga usia >=15",
         },
         {
             "nama_variabel": "indikator_C",
@@ -2893,42 +3115,22 @@ def build_variable_explanation(
         {
             "nama_variabel": "indikator_G",
             "level_output": "keluarga, desa",
-            "label_konsep": "Keterlibatan organisasi kepala keluarga",
+            "label_konsep": "Rasio keterlibatan organisasi keluarga",
             "dimensi": "Lingkungan pendukung sosial",
             "simbol_dimensi": "L_h",
             "bobot_dimensi": 0.20,
-            "sumber_nilai": "kepala keluarga",
-            "aturan_skoring": "0 = 0; 1 organisasi = 0,5; >1 organisasi = 1",
+            "sumber_nilai": "usia, par_organisasi, organisasi_nama",
+            "aturan_skoring": "jumlah anggota keluarga usia >=9 yang mengikuti organisasi / jumlah anggota keluarga usia >=9",
         },
         {
             "nama_variabel": "indikator_H",
             "level_output": "keluarga, desa",
-            "label_konsep": "Keterlibatan organisasi anggota keluarga",
+            "label_konsep": "Rasio partisipasi kegiatan masyarakat keluarga",
             "dimensi": "Lingkungan pendukung sosial",
             "simbol_dimensi": "L_h",
             "bobot_dimensi": 0.10,
-            "sumber_nilai": "par_organisasi, organisasi_nama",
-            "aturan_skoring": "0 = tidak ada anggota ikut organisasi; 0,5 = ada satu anggota/satu organisasi; 1 = lebih dari satu anggota/lebih dari satu organisasi",
-        },
-        {
-            "nama_variabel": "indikator_I",
-            "level_output": "keluarga, desa",
-            "label_konsep": "Partisipasi kepala keluarga pada kegiatan masyarakat",
-            "dimensi": "Lingkungan pendukung sosial",
-            "simbol_dimensi": "L_h",
-            "bobot_dimensi": 0.10,
-            "sumber_nilai": "status_dalam_keluarga, par_masyarakat",
-            "aturan_skoring": "0 = tidak berpartisipasi; 0,5 = satu kegiatan/terbatas; 1 = lebih dari satu kegiatan/aktif",
-        },
-        {
-            "nama_variabel": "indikator_J",
-            "level_output": "keluarga, desa",
-            "label_konsep": "Partisipasi anggota keluarga pada kegiatan masyarakat",
-            "dimensi": "Lingkungan pendukung sosial",
-            "simbol_dimensi": "L_h",
-            "bobot_dimensi": 0.10,
-            "sumber_nilai": "par_masyarakat",
-            "aturan_skoring": "0 = tidak ada anggota berpartisipasi; 0,5 = satu anggota/satu kegiatan; 1 = lebih dari satu anggota/lebih dari satu kegiatan",
+            "sumber_nilai": "usia, par_masyarakat",
+            "aturan_skoring": "jumlah anggota keluarga usia >=16 yang berpartisipasi dalam kegiatan masyarakat / jumlah anggota keluarga usia >=16",
         },
         {
             "nama_variabel": "indikator_K",
@@ -3007,8 +3209,8 @@ def build_variable_explanation(
             "dimensi": "Lingkungan pendukung sosial",
             "simbol_dimensi": "L_h",
             "bobot_dimensi": 0.10,
-            "sumber_nilai": "rerata indikator_G, indikator_H, indikator_I, indikator_J",
-            "aturan_skoring": "mean(indikator_G, indikator_H, indikator_I, indikator_J)",
+            "sumber_nilai": "rerata indikator_G dan indikator_H",
+            "aturan_skoring": "mean(indikator_G, indikator_H)",
         },
         {
             "nama_variabel": "iid_rumah_tangga",
@@ -3057,6 +3259,29 @@ def build_variable_explanation(
             "aturan_skoring": "1 - iid_desa; bukan Indeks Kesejahteraan Desa, melainkan komplemen untuk membaca deprivasi digital",
         },
         {
+            "nama_variabel": "interpretasi_iid_desa",
+            "level_output": "desa",
+            "label_konsep": "Interpretasi absolut IID-Desa",
+            "dimensi": "klasifikasi desa",
+            "simbol_dimensi": "Kategori IID-Desa",
+            "bobot_dimensi": pd.NA,
+            "sumber_nilai": "turunan dari iid_desa",
+            "aturan_skoring": (
+                "Rendah <0,60; Sedang >=0,60-<0,70; Tinggi >=0,70-<0,80; "
+                "Sangat Tinggi >=0,80"
+            ),
+        },
+        {
+            "nama_variabel": "interpretasi_ikd_desa",
+            "level_output": "desa",
+            "label_konsep": "Interpretasi tertil IKD-Desa",
+            "dimensi": "klasifikasi deprivasi digital desa",
+            "simbol_dimensi": "Kategori IKD-Desa",
+            "bobot_dimensi": pd.NA,
+            "sumber_nilai": "turunan dari ikd_desa",
+            "aturan_skoring": IKD_INTERPRETATION_RULE_TEXT,
+        },
+        {
             "nama_variabel": "gini_iid_rumah_tangga",
             "level_output": "desa",
             "label_konsep": "Ketimpangan internal skor rumah tangga dalam desa",
@@ -3069,12 +3294,32 @@ def build_variable_explanation(
         {
             "nama_variabel": "interpretasi_gini",
             "level_output": "desa",
-            "label_konsep": "Kategori relatif Gini IID-RT",
+            "label_konsep": "Kategori tertil Gini IID-RT",
             "dimensi": "klasifikasi relatif ketimpangan desa",
-            "simbol_dimensi": "Kategori relatif Gini",
+            "simbol_dimensi": "Kategori tertil Gini",
             "bobot_dimensi": pd.NA,
             "sumber_nilai": "turunan dari gini_iid_rumah_tangga",
             "aturan_skoring": GINI_INTERPRETATION_RULE_TEXT,
+        },
+        {
+            "nama_variabel": "dds_desa",
+            "level_output": "desa",
+            "label_konsep": "Digital Deprivation and Within-Village Inequality",
+            "dimensi": "gabungan deprivasi digital dan ketimpangan internal",
+            "simbol_dimensi": "DDS",
+            "bobot_dimensi": "50% IKD-Desa; 50% Gini IID-RT",
+            "sumber_nilai": "turunan dari iid_desa dan gini_iid_rumah_tangga",
+            "aturan_skoring": DDS_RULE_TEXT,
+        },
+        {
+            "nama_variabel": "interpretasi_dds_desa",
+            "level_output": "desa",
+            "label_konsep": "Interpretasi tertil DDS",
+            "dimensi": "klasifikasi prioritas deprivasi dan ketimpangan",
+            "simbol_dimensi": "Kategori DDS",
+            "bobot_dimensi": pd.NA,
+            "sumber_nilai": "turunan dari dds_desa",
+            "aturan_skoring": DDS_INTERPRETATION_RULE_TEXT,
         },
     ]
     explanation_df = pd.DataFrame(rows)
@@ -3160,10 +3405,8 @@ def build_recommended_variable_explanation(
         "indikator_D": 1.00,
         "indikator_E": 0.50,
         "indikator_F": 0.50,
-        "indikator_G": 0.25,
-        "indikator_H": 0.25,
-        "indikator_I": 0.25,
-        "indikator_J": 0.25,
+        "indikator_G": 0.50,
+        "indikator_H": 0.50,
         "indikator_K": 1 / 3,
         "indikator_L": 1 / 3,
         "indikator_M": 1 / 3,
@@ -3183,7 +3426,7 @@ def build_recommended_variable_explanation(
         "weighted_mean(indikator_K=0,333333; indikator_L=0,333333; indikator_M=0,333333)"
     )
     explanation_df.loc[explanation_df["nama_variabel"] == "dimensi_E", "aturan_skoring"] = (
-        "weighted_mean(indikator_G=0,25; indikator_H=0,25; indikator_I=0,25; indikator_J=0,25)"
+        "weighted_mean(indikator_G=0,50; indikator_H=0,50)"
     )
     explanation_df.loc[explanation_df["nama_variabel"] == "kategori_iid_rt", "aturan_skoring"] = (
         f"quintile empiris IID-RT: sangat rendah {category_ranges['sangat rendah']}; rendah {category_ranges['rendah']}; "
@@ -3243,11 +3486,11 @@ def build_recommended_scheme_specification(
             "kode": pd.NA,
             "nama": "Jumlah indikator total",
             "jumlah_indikator_dimensi": len(INDICATOR_OUTPUT_MAP),
-            "rule_data": "3 indikator akses + 1 konektivitas + 2 kapasitas + 3 penggunaan + 4 sosial",
+            "rule_data": "3 indikator akses + 1 konektivitas + 2 kapasitas + 3 penggunaan + 2 sosial",
             "skoring": pd.NA,
             "bobot_dalam_dimensi": pd.NA,
             "bobot_dimensi_ke_iid": pd.NA,
-            "catatan": "Total 13 indikator",
+            "catatan": "Total 11 indikator",
         },
         {
             "level": "kategori",
@@ -3399,6 +3642,7 @@ def apply_excel_number_formats(workbook: object, sheets: dict[str, pd.DataFrame]
         "dimensi_",
         "iid_",
         "ikd_",
+        "dds_",
         "gini_",
         "proporsi_",
         "persentase_",

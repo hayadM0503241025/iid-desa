@@ -1,0 +1,17 @@
+﻿kelompok,metrik,skema_awal,skema_rekomendasi,catatan
+statistik_iid_rt,rata_rata,0.596028,0.596028,
+statistik_iid_rt,standar_deviasi,0.185083,0.185083,
+statistik_iid_rt,minimum,0,0,
+statistik_iid_rt,quintile_1,0.4875,0.4875,
+statistik_iid_rt,quintile_2,0.590278,0.590278,
+statistik_iid_rt,quintile_3,0.6625,0.6625,
+statistik_iid_rt,quintile_4,0.739167,0.739167,
+statistik_iid_rt,persentil_90,0.791667,0.791667,
+statistik_iid_rt,persentil_95,0.833333,0.833333,
+statistik_iid_rt,persentil_99,0.9,0.9,
+statistik_iid_rt,maksimum,1,1,
+jumlah_kk_per_kategori,sangat rendah,5997,19207,"Skema awal memakai cutoff tetap 0,20/0,40/0,60/0,80; skema rekomendasi memakai quintile 0.4875/0.590278/0.6625/0.739167"
+jumlah_kk_per_kategori,rendah,5156,19070,"Skema awal memakai cutoff tetap 0,20/0,40/0,60/0,80; skema rekomendasi memakai quintile 0.4875/0.590278/0.6625/0.739167"
+jumlah_kk_per_kategori,sedang,29707,19892,"Skema awal memakai cutoff tetap 0,20/0,40/0,60/0,80; skema rekomendasi memakai quintile 0.4875/0.590278/0.6625/0.739167"
+jumlah_kk_per_kategori,tinggi,46367,18404,"Skema awal memakai cutoff tetap 0,20/0,40/0,60/0,80; skema rekomendasi memakai quintile 0.4875/0.590278/0.6625/0.739167"
+jumlah_kk_per_kategori,sangat tinggi,8464,19118,"Skema awal memakai cutoff tetap 0,20/0,40/0,60/0,80; skema rekomendasi memakai quintile 0.4875/0.590278/0.6625/0.739167"

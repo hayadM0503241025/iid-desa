@@ -1875,6 +1875,7 @@ def build_sna_network(
     threshold_grid=None,
     edge_feature_cols=None,
     onehot_round_decimals=2,
+    threshold_mode="Auto Distribution",
 ):
     if len(df_v) < 5:
         return None
@@ -1883,6 +1884,14 @@ def build_sna_network(
         method_norm = "cosine"
     if threshold_grid is None:
         threshold_grid = [round(x, 1) for x in np.arange(0.1, 1.0, 0.1)]
+    threshold_grid = [float(x) for x in threshold_grid]
+    threshold_mode_norm = str(threshold_mode or "Auto Distribution").strip().lower()
+    if threshold_mode_norm in {"fixed", "fixed threshold"}:
+        threshold_mode_label = "Fixed Threshold"
+    elif threshold_mode_norm in {"sensitivity", "sensitivity mode"}:
+        threshold_mode_label = "Sensitivity Mode"
+    else:
+        threshold_mode_label = "Auto Distribution"
 
     G = nx.Graph()
     threshold_used = 0.4
@@ -1936,10 +1945,20 @@ def build_sna_network(
                 sim_weight = compute_pearson_similarity(vec_i, vec_j)
             pairwise_similarity_values.append(float(sim_weight))
             candidate_edges.append((ids[i], ids[j], float(sim_weight)))
-    threshold_used, threshold_distribution = compute_auto_threshold_from_distribution(
+
+    auto_threshold, threshold_distribution = compute_auto_threshold_from_distribution(
         pairwise_similarity_values,
         threshold_grid=threshold_grid,
     )
+    if threshold_mode_label == "Auto Distribution":
+        threshold_used = float(auto_threshold)
+    else:
+        threshold_used = float(threshold_val if threshold_val is not None else auto_threshold)
+
+    edge_count_per_threshold = [
+        {"threshold": float(t), "edge_count": int(sum(1 for _, _, w in candidate_edges if w >= float(t)))}
+        for t in threshold_grid
+    ]
     for u, v, sim_weight in candidate_edges:
         if sim_weight >= threshold_used:
             G.add_edge(u, v, weight=sim_weight)
@@ -1984,10 +2003,22 @@ def build_sna_network(
         "lcc_nodes": G_lcc.number_of_nodes(),
         "lcc_edges": G_lcc.number_of_edges(),
         "similarity_method": method_norm,
+        "method_name": {
+            "cosine": "Cosine Similarity",
+            "jaccard": "Jaccard Index",
+            "pearson": "Pearson Correlation",
+        }.get(method_norm, method_norm),
+        "threshold_mode": threshold_mode_label,
         "threshold_selected": threshold_used,
-        "threshold_auto": True,
+        "threshold_grid": threshold_grid,
+        "edge_count_per_threshold": edge_count_per_threshold,
+        "threshold_auto": threshold_mode_label == "Auto Distribution",
         "threshold_distribution": threshold_distribution,
         "pairwise_similarity_values": pairwise_similarity_values,
+        "number_of_nodes": int(G.number_of_nodes()),
+        "number_of_candidate_pairs": int(len(candidate_edges)),
+        "number_of_retained_edges": int(G.number_of_edges()),
+        "retained_edge_ratio": float(G.number_of_edges() / len(candidate_edges)) if candidate_edges else 0.0,
         "mode": "LCC only" if lcc_only else "Semua komponen",
         "onehot_round_decimals": int(onehot_round_decimals),
     }
@@ -3355,6 +3386,9 @@ def summarize_all_methods(df_kk, desa_col, basis_col, onehot_round_decimals, thr
                         "Jumlah Klaster": 0,
                         "Modularity": 0.0,
                         "Threshold": np.nan,
+                        "Threshold Mode": "Auto Distribution",
+                        "Retained Edge Ratio": 0.0,
+                        "Candidate Pairs": 0,
                         "Status": "Data tidak mencukupi untuk graf",
                     }
                 )
@@ -3372,6 +3406,9 @@ def summarize_all_methods(df_kk, desa_col, basis_col, onehot_round_decimals, thr
                     "Jumlah Klaster": int(len(set(partition.values()))),
                     "Modularity": _safe_float_metric(community_louvain.modularity(partition, G, weight="weight"), default=0.0),
                     "Threshold": float(meta.get("threshold_selected", np.nan)),
+                    "Threshold Mode": meta.get("threshold_mode", "Auto Distribution"),
+                    "Retained Edge Ratio": float(meta.get("retained_edge_ratio", 0.0)),
+                    "Candidate Pairs": int(meta.get("number_of_candidate_pairs", 0)),
                     "Status": "OK",
                 }
             )
@@ -3406,6 +3443,768 @@ def build_modularity_pivot_table(result_df):
     )
     pivot_df.columns.name = None
     return pivot_df
+
+
+def get_similarity_method_specs():
+    return [
+        ("Cosine Similarity", "cosine"),
+        ("Jaccard Index", "jaccard"),
+        ("Pearson Correlation", "pearson"),
+    ]
+
+
+def evaluate_network_result_row(desa_name, method_label, threshold_value, total_nodes_desa, result, status_message):
+    base_row = {
+        "Desa": desa_name,
+        "Metode": method_label,
+        "Threshold": float(threshold_value) if threshold_value is not None and pd.notna(threshold_value) else np.nan,
+        "Jumlah Node Desa": int(total_nodes_desa),
+        "Jumlah Node Graf": 0,
+        "Jumlah Node": 0,
+        "Jumlah Edge": 0,
+        "Retained Edge Ratio": 0.0,
+        "Density": 0.0,
+        "Jumlah Klaster": 0,
+        "Modularity": 0.0,
+        "Node Coverage": 0.0,
+        "Threshold Mode": "Fixed Threshold",
+        "Status": status_message,
+    }
+    if not result:
+        return base_row
+
+    G, partition, _, meta = result
+    node_count = int(G.number_of_nodes())
+    base_row.update(
+        {
+            "Jumlah Node Graf": node_count,
+            "Jumlah Node": node_count,
+            "Jumlah Edge": int(G.number_of_edges()),
+            "Retained Edge Ratio": float(meta.get("retained_edge_ratio", 0.0)),
+            "Density": float(nx.density(G)) if node_count > 1 else 0.0,
+            "Jumlah Klaster": int(len(set(partition.values()))),
+            "Modularity": _safe_float_metric(community_louvain.modularity(partition, G, weight="weight"), default=0.0),
+            "Node Coverage": float(node_count / total_nodes_desa) if total_nodes_desa > 0 else 0.0,
+            "Threshold Mode": meta.get("threshold_mode", "Fixed Threshold"),
+            "Status": "OK",
+        }
+    )
+    return base_row
+
+
+def run_threshold_sensitivity_analysis(
+    df_kk,
+    desa_col,
+    basis_col,
+    edge_feature_cols,
+    methods,
+    threshold_grid,
+    onehot_round_decimals,
+):
+    if df_kk is None or df_kk.empty or desa_col not in df_kk.columns:
+        return pd.DataFrame()
+
+    method_specs = methods or get_similarity_method_specs()
+    threshold_grid = [float(t) for t in (threshold_grid or [round(x, 1) for x in np.arange(0.1, 1.0, 0.1)])]
+    rows = []
+    desa_values = sorted(df_kk[desa_col].dropna().astype(str).str.strip().unique().tolist())
+    for desa_name in desa_values:
+        df_v = df_kk[df_kk[desa_col].astype(str).str.strip() == desa_name].copy()
+        total_nodes_desa = int(df_v["family_id"].nunique()) if "family_id" in df_v.columns else 0
+        if "f_ikr_dari_rekap_kk" in df_v.columns:
+            df_v = add_bps_ikr_category(df_v, ikr_col="f_ikr_dari_rekap_kk")
+
+        for method_label, method_key in method_specs:
+            for threshold_value in threshold_grid:
+                res = build_sna_network(
+                    df_v,
+                    basis_col,
+                    threshold_value,
+                    lcc_only=True,
+                    similarity_method=method_key,
+                    force_louvain_lcc=True,
+                    threshold_grid=threshold_grid,
+                    edge_feature_cols=edge_feature_cols,
+                    onehot_round_decimals=onehot_round_decimals,
+                    threshold_mode="Fixed Threshold",
+                )
+                rows.append(
+                    evaluate_network_result_row(
+                        desa_name,
+                        method_label,
+                        threshold_value,
+                        total_nodes_desa,
+                        res,
+                        "No network was formed at this threshold",
+                    )
+                )
+    return pd.DataFrame(rows)
+
+
+def collect_similarity_distribution(
+    df_kk,
+    desa_col,
+    basis_col,
+    edge_feature_cols,
+    methods,
+    threshold_grid,
+    onehot_round_decimals,
+):
+    if df_kk is None or df_kk.empty or desa_col not in df_kk.columns:
+        return pd.DataFrame(), pd.DataFrame()
+    rows = []
+    summary_rows = []
+    method_specs = methods or get_similarity_method_specs()
+    desa_values = sorted(df_kk[desa_col].dropna().astype(str).str.strip().unique().tolist())
+    for desa_name in desa_values:
+        df_v = df_kk[df_kk[desa_col].astype(str).str.strip() == desa_name].copy()
+        if "f_ikr_dari_rekap_kk" in df_v.columns:
+            df_v = add_bps_ikr_category(df_v, ikr_col="f_ikr_dari_rekap_kk")
+        for method_label, method_key in method_specs:
+            res = build_sna_network(
+                df_v,
+                basis_col,
+                0.40,
+                lcc_only=True,
+                similarity_method=method_key,
+                force_louvain_lcc=True,
+                threshold_grid=threshold_grid,
+                edge_feature_cols=edge_feature_cols,
+                onehot_round_decimals=onehot_round_decimals,
+                threshold_mode="Auto Distribution",
+            )
+            if not res:
+                summary_rows.append(
+                    {
+                        "Desa": desa_name,
+                        "Metode": method_label,
+                        "Threshold Selected": np.nan,
+                        "Retained Edge Ratio": 0.0,
+                        "Negative Share": 0.0,
+                        "Zero Share": 0.0,
+                        "Positive Share": 0.0,
+                        "Number of Pairs": 0,
+                    }
+                )
+                continue
+            _, _, _, meta = res
+            sim_vals = pd.Series(meta.get("pairwise_similarity_values", []), dtype="float64").replace([np.inf, -np.inf], np.nan).dropna()
+            for sim_val in sim_vals.tolist():
+                rows.append(
+                    {
+                        "Desa": desa_name,
+                        "Metode": method_label,
+                        "Similarity": float(sim_val),
+                        "Threshold Selected": float(meta.get("threshold_selected", np.nan)),
+                    }
+                )
+            total = max(len(sim_vals), 1)
+            summary_rows.append(
+                {
+                    "Desa": desa_name,
+                    "Metode": method_label,
+                    "Threshold Selected": float(meta.get("threshold_selected", np.nan)),
+                    "Retained Edge Ratio": float(meta.get("retained_edge_ratio", 0.0)),
+                    "Negative Share": float((sim_vals < 0).sum() / total),
+                    "Zero Share": float(np.isclose(sim_vals, 0.0).sum() / total),
+                    "Positive Share": float((sim_vals > 0).sum() / total),
+                    "Number of Pairs": int(len(sim_vals)),
+                }
+            )
+    return pd.DataFrame(rows), pd.DataFrame(summary_rows)
+
+
+def build_delta_modularity_table(result_df):
+    valid_df = result_df[result_df["Status"] == "OK"].copy()
+    if valid_df.empty:
+        return pd.DataFrame()
+    valid_df["Best_Modularity_Per_Desa"] = valid_df.groupby("Desa")["Modularity"].transform("max")
+    valid_df["Delta_to_Best"] = valid_df["Modularity"] - valid_df["Best_Modularity_Per_Desa"]
+    valid_df["Label"] = valid_df.apply(
+        lambda r: f"M={float(r['Modularity']):.4f}<br>Delta={float(r['Delta_to_Best']):.4f}",
+        axis=1,
+    )
+    return valid_df
+
+
+def build_pairwise_delta_table(result_df):
+    valid_df = result_df[result_df["Status"] == "OK"].copy()
+    if valid_df.empty:
+        return pd.DataFrame()
+    pivot = valid_df.pivot_table(index="Desa", columns="Metode", values="Modularity", aggfunc="mean")
+    pairs = [
+        ("Jaccard - Cosine", "Jaccard Index", "Cosine Similarity"),
+        ("Jaccard - Pearson", "Jaccard Index", "Pearson Correlation"),
+        ("Cosine - Pearson", "Cosine Similarity", "Pearson Correlation"),
+    ]
+    rows = []
+    for desa_name, row in pivot.iterrows():
+        for label, left, right in pairs:
+            if left in row.index and right in row.index and pd.notna(row.get(left)) and pd.notna(row.get(right)):
+                rows.append({"Desa": desa_name, "Pairwise Delta": label, "Delta": float(row[left] - row[right])})
+    return pd.DataFrame(rows)
+
+
+def build_rank_stability_table(result_df):
+    valid_df = result_df[result_df["Status"] == "OK"].copy()
+    if valid_df.empty:
+        return pd.DataFrame(), pd.DataFrame()
+    valid_df["Rank"] = valid_df.groupby("Desa")["Modularity"].rank(method="min", ascending=False).astype(int)
+    valid_df["Best_Modularity_Per_Desa"] = valid_df.groupby("Desa")["Modularity"].transform("max")
+    valid_df["Delta_to_Best"] = valid_df["Modularity"] - valid_df["Best_Modularity_Per_Desa"]
+    total_desa = max(valid_df["Desa"].nunique(), 1)
+    rank_counts = (
+        valid_df.pivot_table(index="Metode", columns="Rank", values="Desa", aggfunc="count", fill_value=0)
+        .reset_index()
+    )
+    for rank_num in [1, 2, 3]:
+        if rank_num not in rank_counts.columns:
+            rank_counts[rank_num] = 0
+    rank_summary = rank_counts.rename(columns={1: "Rank 1", 2: "Rank 2", 3: "Rank 3"})
+    avg_rank = valid_df.groupby("Metode")["Rank"].mean().reset_index(name="Average Rank")
+    rank_summary = rank_summary.merge(avg_rank, on="Metode", how="left")
+    rank_summary["Win Rate"] = rank_summary["Rank 1"] / total_desa
+    return valid_df, rank_summary.sort_values(["Average Rank", "Rank 1"], ascending=[True, False]).reset_index(drop=True)
+
+
+def classify_village_sensitivity(result_df):
+    valid_df = result_df[result_df["Status"] == "OK"].copy()
+    if valid_df.empty:
+        return pd.DataFrame()
+    rows = []
+    for desa_name, sub in valid_df.groupby("Desa"):
+        sub_sorted = sub.sort_values("Modularity", ascending=False).reset_index(drop=True)
+        max_mod = float(sub_sorted["Modularity"].max())
+        min_mod = float(sub_sorted["Modularity"].min())
+        spread = max_mod - min_mod
+        winner = str(sub_sorted.iloc[0]["Metode"])
+        runner = str(sub_sorted.iloc[1]["Metode"]) if len(sub_sorted) > 1 else "-"
+        gap_rank_2 = float(sub_sorted.iloc[0]["Modularity"] - sub_sorted.iloc[1]["Modularity"]) if len(sub_sorted) > 1 else max_mod
+        if spread <= 0.005:
+            sensitivity_label = "Stable Village"
+        elif spread <= 0.015:
+            sensitivity_label = "Moderate Sensitivity"
+        else:
+            sensitivity_label = "Method-Sensitive Village"
+        dominance = (
+            "Jaccard-Dominant"
+            if winner == "Jaccard Index" and gap_rank_2 > 0.005
+            else "Alternative-Dominant"
+            if winner in {"Cosine Similarity", "Pearson Correlation"} and gap_rank_2 > 0.005
+            else "No Clear Dominance"
+        )
+        rows.append(
+            {
+                "Desa": desa_name,
+                "Sensitivity Category": sensitivity_label,
+                "Dominance Category": dominance,
+                "Best Method": winner,
+                "Runner Up": runner,
+                "Max Modularity": max_mod,
+                "Min Modularity": min_mod,
+                "Spread Modularity": spread,
+                "Gap Rank 1-2": gap_rank_2,
+            }
+        )
+    return pd.DataFrame(rows)
+
+
+def build_frontier_zone_df(df_in):
+    if df_in is None or df_in.empty:
+        return pd.DataFrame()
+    df = df_in[df_in["Status"] == "OK"].copy()
+    if df.empty:
+        return df
+    if "Node Coverage" not in df.columns:
+        df["Node Coverage"] = np.where(df["Jumlah Node Desa"] > 0, df["Jumlah Node"] / df["Jumlah Node Desa"], 0.0)
+    cov_med = float(df["Node Coverage"].median())
+    mod_med = float(df["Modularity"].median())
+    df["Frontier Zone"] = np.select(
+        [
+            (df["Node Coverage"] >= cov_med) & (df["Modularity"] >= mod_med),
+            (df["Node Coverage"] < cov_med) & (df["Modularity"] >= mod_med),
+            (df["Node Coverage"] >= cov_med) & (df["Modularity"] < mod_med),
+        ],
+        ["Ideal", "Selective", "Broad but Weak",],
+        default="Low Priority",
+    )
+    return df
+
+
+def generate_q1_methodology_insight(result_df, sensitivity_df=None):
+    if result_df is None or result_df.empty:
+        return "The methodological narrative cannot be generated because the evaluation table is empty."
+    score_df, _, winner_method = build_journal_score_summary(result_df)
+    rank_detail, rank_summary = build_rank_stability_table(result_df)
+    valid_df = result_df[result_df["Status"] == "OK"].copy()
+    if valid_df.empty or score_df.empty:
+        return "The methodological narrative cannot be generated because no valid network was produced by the evaluated methods."
+
+    top_mean = score_df.sort_values("Mean_Modularity", ascending=False).iloc[0]
+    top_win = score_df.sort_values("Village_Win_Rate", ascending=False).iloc[0]
+    top_cov = score_df.sort_values("Mean_Node_Coverage", ascending=False).iloc[0]
+    top_rank = rank_summary.sort_values("Average Rank", ascending=True).iloc[0] if not rank_summary.empty else top_win
+
+    robustness_sentence = "Threshold sensitivity has not yet been computed for this session."
+    if sensitivity_df is not None and not sensitivity_df.empty:
+        sens_valid = sensitivity_df[sensitivity_df["Status"] == "OK"].copy()
+        if not sens_valid.empty:
+            stability = (
+                sens_valid.groupby("Metode")["Modularity"]
+                .std()
+                .replace([np.inf, -np.inf], np.nan)
+                .fillna(0.0)
+                .reset_index(name="Std_Modularity")
+                .sort_values("Std_Modularity")
+            )
+            stable_method = stability.iloc[0]["Metode"]
+            robustness_sentence = (
+                f"In the threshold sensitivity analysis, {stable_method} exhibits the lowest variation in modularity "
+                f"(SD={float(stability.iloc[0]['Std_Modularity']):.4f}), indicating the most stable response to changes in the edge-retention threshold."
+            )
+
+    frontier_df = build_frontier_zone_df(valid_df)
+    ideal_counts = frontier_df[frontier_df["Frontier Zone"] == "Ideal"]["Metode"].value_counts()
+    ideal_method = ideal_counts.index[0] if not ideal_counts.empty else str(top_cov["Metode"])
+    low_cov = frontier_df[frontier_df["Node Coverage"] < 0.50]
+    tradeoff_sentence = (
+        "No strong indication of very low node coverage is observed among valid networks."
+        if low_cov.empty
+        else f"{int(low_cov['Desa'].nunique())} village(s) show node coverage below 50%, suggesting that modularity should be interpreted jointly with network coverage."
+    )
+
+    primary_method = winner_method or str(top_mean["Metode"])
+    alternative_method = str(top_cov["Metode"]) if str(top_cov["Metode"]) != primary_method else str(top_win["Metode"])
+    return (
+        f"{primary_method} is recommended as the primary edge-formation method because it obtains the highest composite score across villages. "
+        f"The highest mean modularity is achieved by {top_mean['Metode']} (mean={float(top_mean['Mean_Modularity']):.4f}), "
+        f"whereas the highest village-level win rate is observed for {top_win['Metode']} ({float(top_win['Village_Win_Rate']):.2%}). "
+        f"The best node coverage is produced by {top_cov['Metode']} ({float(top_cov['Mean_Node_Coverage']):.2%}), and the most favorable average rank is obtained by {top_rank['Metode']} "
+        f"(average rank={float(top_rank['Average Rank']):.2f}). {robustness_sentence} {tradeoff_sentence} "
+        f"Methodologically, {primary_method} should be used as the primary reporting method, while {alternative_method} remains useful as a comparative benchmark when node coverage or structural stability is central to interpretation. "
+        "Villages with small modularity gaps across methods can be interpreted as robust to the choice of similarity measure; villages with large gaps should be reported as method-sensitive cases."
+    )
+
+
+def render_network_small_multiple_figure(G, partition, title):
+    if G is None or G.number_of_nodes() == 0:
+        return None
+    pos = nx.spring_layout(G, seed=42, weight="weight")
+    nodes = list(G.nodes())
+    degree_vals = {n: float(G.degree(n, weight="weight")) for n in nodes}
+    max_degree = max(degree_vals.values()) if degree_vals else 1.0
+    fig = go.Figure()
+    for u, v, d in G.edges(data=True):
+        w = _safe_float_metric(d.get("weight"), default=0.0)
+        fig.add_trace(
+            go.Scatter(
+                x=[pos[u][0], pos[v][0], None],
+                y=[pos[u][1], pos[v][1], None],
+                mode="lines",
+                line=dict(width=0.5 + 2.4 * max(w, 0.0), color=f"rgba(51,65,85,{float(np.clip(0.12 + 0.68 * max(w, 0.0), 0.12, 0.80))})"),
+                hoverinfo="none",
+                showlegend=False,
+            )
+        )
+    hover_text = []
+    for n in nodes:
+        attrs = G.nodes[n]
+        hover_text.append(
+            f"Family ID: {n}"
+            f"<br>Nama: {attrs.get('nama', '-')}"
+            f"<br>Village/Hamlet: {attrs.get('deskel', attrs.get('desa', '-'))} / {attrs.get('dusun', '-')}"
+            f"<br>Cluster: {partition.get(n, attrs.get('cluster', '-'))}"
+            f"<br>F_IKR: {_safe_float_metric(attrs.get('f_ikr_dari_rekap_kk'), default=np.nan):.2f}"
+            f"<br>Kategori IKR: {attrs.get('kategori_ikr', '-')}"
+            f"<br>Weighted Degree: {degree_vals.get(n, 0.0):.4f}"
+        )
+    fig.add_trace(
+        go.Scatter(
+            x=[pos[n][0] for n in nodes],
+            y=[pos[n][1] for n in nodes],
+            mode="markers",
+            marker=dict(
+                size=[8 + 22 * (degree_vals.get(n, 0.0) / max(max_degree, 1e-9)) for n in nodes],
+                color=[int(partition.get(n, G.nodes[n].get("cluster", 0))) for n in nodes],
+                colorscale="Turbo",
+                showscale=True,
+                colorbar=dict(title="Cluster"),
+                line=dict(color="#0f172a", width=0.7),
+            ),
+            text=hover_text,
+            hoverinfo="text",
+            showlegend=False,
+        )
+    )
+    fig.update_layout(
+        title=title,
+        template="plotly_white",
+        height=430,
+        margin=dict(l=10, r=10, t=48, b=10),
+        xaxis=dict(visible=False),
+        yaxis=dict(visible=False),
+    )
+    return fig
+
+
+def render_q1_robustness_validation(
+    df_kk,
+    result_df,
+    desa_col,
+    basis_col,
+    onehot_round_decimals,
+    threshold_grid,
+):
+    st.markdown("### Q1 Robustness & Method Validation")
+    methods = get_similarity_method_specs()
+    run_sensitivity = st.checkbox(
+        "Run threshold sensitivity analysis",
+        value=False,
+        help="This can be computationally expensive because it rebuilds networks for every village, method, and threshold.",
+    )
+    sensitivity_df = pd.DataFrame()
+    if run_sensitivity:
+        with st.spinner("Computing threshold sensitivity across villages, methods, and thresholds..."):
+            sensitivity_df = run_threshold_sensitivity_analysis(
+                df_kk,
+                desa_col,
+                basis_col,
+                EDGE_REKAP_COLS,
+                methods,
+                threshold_grid,
+                onehot_round_decimals,
+            )
+    q1_narrative = generate_q1_methodology_insight(result_df, sensitivity_df=sensitivity_df)
+    st.markdown(f"<div class='premium-hero'><b>Executive Insight</b><br>{q1_narrative}</div>", unsafe_allow_html=True)
+
+    with st.expander("1. Threshold Sensitivity Analysis", expanded=True):
+        if not run_sensitivity:
+            st.info("Enable `Run threshold sensitivity analysis` above to compute threshold-level robustness. The default view is intentionally lazy to keep the dashboard responsive.")
+        elif sensitivity_df.empty:
+            st.warning("Sensitivity analysis did not produce any data.")
+        else:
+            desa_options = ["Cross-village average"] + sorted(sensitivity_df["Desa"].dropna().astype(str).unique().tolist())
+            selected_desa = st.selectbox("Village filter for sensitivity analysis", desa_options, index=0)
+            if selected_desa == "Cross-village average":
+                sens_plot = (
+                    sensitivity_df[sensitivity_df["Status"] == "OK"]
+                    .groupby(["Metode", "Threshold"], as_index=False)
+                    .agg(
+                        Modularity=("Modularity", "mean"),
+                        **{"Node Coverage": ("Node Coverage", "mean")},
+                        **{"Jumlah Edge": ("Jumlah Edge", "mean")},
+                        **{"Retained Edge Ratio": ("Retained Edge Ratio", "mean")},
+                    )
+                )
+                plot_title_suffix = "Cross-village Average"
+            else:
+                sens_plot = sensitivity_df[(sensitivity_df["Status"] == "OK") & (sensitivity_df["Desa"].astype(str) == selected_desa)].copy()
+                plot_title_suffix = selected_desa
+            c1, c2 = st.columns(2)
+            with c1:
+                fig_sens_mod = px.line(
+                    sens_plot,
+                    x="Threshold",
+                    y="Modularity",
+                    color="Metode",
+                    markers=True,
+                    title=f"Threshold vs Modularity - {plot_title_suffix}",
+                    labels={"Metode": "Method"},
+                )
+                st.plotly_chart(fig_sens_mod, use_container_width=True, config=PLOTLY_DRAW_CONFIG)
+                fig_sens_cov = px.line(
+                    sens_plot,
+                    x="Threshold",
+                    y="Node Coverage",
+                    color="Metode",
+                    markers=True,
+                    title=f"Threshold vs Node Coverage - {plot_title_suffix}",
+                    labels={"Metode": "Method"},
+                )
+                fig_sens_cov.update_layout(yaxis_tickformat=".0%", legend_title_text="Method")
+                st.plotly_chart(fig_sens_cov, use_container_width=True, config=PLOTLY_DRAW_CONFIG)
+            with c2:
+                fig_sens_edge = px.line(
+                    sens_plot,
+                    x="Threshold",
+                    y="Jumlah Edge",
+                    color="Metode",
+                    markers=True,
+                    title=f"Threshold vs Number of Edges - {plot_title_suffix}",
+                    labels={"Metode": "Method", "Jumlah Edge": "Number of Edges"},
+                )
+                fig_sens_edge.update_layout(yaxis_title="Number of Edges", legend_title_text="Method")
+                st.plotly_chart(fig_sens_edge, use_container_width=True, config=PLOTLY_DRAW_CONFIG)
+                stability_df = (
+                    sensitivity_df[sensitivity_df["Status"] == "OK"]
+                    .groupby("Metode", as_index=False)
+                    .agg(
+                        Mean_Modularity=("Modularity", "mean"),
+                        Std_Modularity=("Modularity", "std"),
+                        Mean_Node_Coverage=("Node Coverage", "mean"),
+                        Mean_Retained_Ratio=("Retained Edge Ratio", "mean"),
+                    )
+                    .fillna(0.0)
+                    .sort_values(["Std_Modularity", "Mean_Modularity"], ascending=[True, False])
+                )
+                st.dataframe(stability_df, use_container_width=True, hide_index=True)
+            if not sens_plot.empty:
+                best_tradeoff = sens_plot.assign(Tradeoff=sens_plot["Modularity"] * sens_plot["Node Coverage"]).sort_values("Tradeoff", ascending=False).head(1)
+                if not best_tradeoff.empty:
+                    row = best_tradeoff.iloc[0]
+                    st.info(f"Best observed trade-off in this subset: {row['Metode']} at threshold {float(row['Threshold']):.2f} (modularity {float(row['Modularity']):.4f}, coverage {float(row['Node Coverage']):.2%}).")
+
+    with st.expander("2. Delta Modularity Heatmap", expanded=True):
+        delta_df = build_delta_modularity_table(result_df)
+        if delta_df.empty:
+            st.warning("Delta modularity is not available.")
+        else:
+            delta_pivot = delta_df.pivot(index="Desa", columns="Metode", values="Delta_to_Best")
+            label_pivot = delta_df.pivot(index="Desa", columns="Metode", values="Label").reindex_like(delta_pivot)
+            fig_delta = px.imshow(
+                delta_pivot,
+                text_auto=".4f",
+                color_continuous_scale="RdBu",
+                aspect="auto",
+                title="Delta to Best Modularity by Village",
+                labels=dict(x="Method", y="Village", color="Delta"),
+            )
+            fig_delta.update_traces(text=label_pivot.values, texttemplate="%{text}")
+            st.plotly_chart(fig_delta, use_container_width=True, config=PLOTLY_DRAW_CONFIG)
+
+            pairwise_df = build_pairwise_delta_table(result_df)
+            if not pairwise_df.empty:
+                pair_pivot = pairwise_df.pivot(index="Desa", columns="Pairwise Delta", values="Delta")
+                fig_pair = px.imshow(
+                    pair_pivot,
+                    text_auto=".4f",
+                    color_continuous_scale="RdBu",
+                    aspect="auto",
+                    title="Pairwise Delta Modularity",
+                    labels=dict(x="Method Pair", y="Village", color="Delta"),
+                )
+                st.plotly_chart(fig_pair, use_container_width=True, config=PLOTLY_DRAW_CONFIG)
+            spread_df = classify_village_sensitivity(result_df)
+            if not spread_df.empty:
+                stable = spread_df.sort_values("Spread Modularity").head(3)["Desa"].astype(str).tolist()
+                sensitive = spread_df.sort_values("Spread Modularity", ascending=False).head(3)["Desa"].astype(str).tolist()
+                near_best = delta_df[delta_df["Delta_to_Best"] >= -0.005]["Metode"].value_counts().idxmax()
+                st.info(f"Most robust villages: {', '.join(stable)}. Most method-sensitive villages: {', '.join(sensitive)}. Method most frequently close to the best method: {near_best}.")
+
+    with st.expander("3. Rank Stability Plot", expanded=True):
+        rank_detail, rank_summary = build_rank_stability_table(result_df)
+        if rank_summary.empty:
+            st.warning("Method ranking is not available.")
+        else:
+            rank_long = rank_summary.melt(id_vars=["Metode", "Average Rank", "Win Rate"], value_vars=["Rank 1", "Rank 2", "Rank 3"], var_name="Rank", value_name="Number of Villages")
+            fig_rank = px.bar(
+                rank_long,
+                x="Metode",
+                y="Number of Villages",
+                color="Rank",
+                barmode="stack",
+                title="Distribution of Method Ranks across Villages",
+                labels={"Metode": "Method"},
+            )
+            fig_rank.update_layout(xaxis_title="Method")
+            st.plotly_chart(fig_rank, use_container_width=True, config=PLOTLY_DRAW_CONFIG)
+            fig_bump = px.line(
+                rank_detail.sort_values(["Desa", "Rank"]),
+                x="Desa",
+                y="Rank",
+                color="Metode",
+                markers=True,
+                title="Method Ranking Bump Chart across Villages",
+                labels={"Desa": "Village", "Metode": "Method"},
+            )
+            fig_bump.update_layout(xaxis_title="Village", legend_title_text="Method")
+            fig_bump.update_yaxes(autorange="reversed", dtick=1)
+            st.plotly_chart(fig_bump, use_container_width=True, config=PLOTLY_DRAW_CONFIG)
+            st.dataframe(rank_summary, use_container_width=True, hide_index=True)
+            best_consistent = rank_summary.sort_values("Average Rank").iloc[0]["Metode"]
+            runner = rank_summary.sort_values("Rank 2", ascending=False).iloc[0]["Metode"]
+            ambiguous = rank_detail.groupby("Desa")["Delta_to_Best"].apply(lambda s: int((s >= -0.005).sum())).reset_index(name="Near Best Count")
+            ambiguous_list = ambiguous[ambiguous["Near Best Count"] > 1]["Desa"].astype(str).head(5).tolist()
+            st.info(f"Most consistent method: {best_consistent}. Most frequent runner-up: {runner}. Ambiguous villages with small method gaps: {', '.join(ambiguous_list) if ambiguous_list else '-'}.")
+
+    with st.expander("4. Coverage vs Modularity Frontier", expanded=True):
+        frontier_df = build_frontier_zone_df(result_df)
+        if frontier_df.empty:
+            st.warning("The frontier analysis is not available.")
+        else:
+            fig_front = px.scatter(
+                frontier_df,
+                x="Node Coverage",
+                y="Modularity",
+                color="Metode",
+                size="Jumlah Edge",
+                symbol="Threshold Mode",
+                hover_data=["Desa", "Threshold", "Jumlah Node", "Jumlah Edge", "Jumlah Klaster", "Frontier Zone"],
+                title="Coverage vs Modularity Frontier",
+                labels={
+                    "Metode": "Method",
+                    "Desa": "Village",
+                    "Jumlah Node": "Number of Nodes",
+                    "Jumlah Edge": "Number of Edges",
+                    "Jumlah Klaster": "Number of Clusters",
+                },
+            )
+            fig_front.update_layout(xaxis_title="Node Coverage", legend_title_text="Method")
+            fig_front.add_vline(x=float(frontier_df["Node Coverage"].median()), line_dash="dash", line_color="#64748b")
+            fig_front.add_hline(y=float(frontier_df["Modularity"].median()), line_dash="dash", line_color="#64748b")
+            fig_front.add_annotation(x=0.92, y=0.95, xref="paper", yref="paper", text="Ideal", showarrow=False, font=dict(color="#0f766e"))
+            fig_front.add_annotation(x=0.08, y=0.95, xref="paper", yref="paper", text="Selective", showarrow=False, font=dict(color="#b91c1c"))
+            fig_front.update_layout(xaxis_tickformat=".0%")
+            st.plotly_chart(fig_front, use_container_width=True, config=PLOTLY_DRAW_CONFIG)
+            zone_counts = frontier_df.groupby(["Metode", "Frontier Zone"]).size().reset_index(name="Count")
+            st.dataframe(zone_counts, use_container_width=True, hide_index=True)
+
+    with st.expander("5. Edge Density vs Modularity", expanded=False):
+        density_df = result_df[result_df["Status"] == "OK"].copy()
+        if density_df.empty:
+            st.warning("The density plot is not available.")
+        else:
+            fig_density = px.scatter(
+                density_df,
+                x="Density",
+                y="Modularity",
+                color="Metode",
+                size="Jumlah Node",
+                hover_data=["Desa", "Threshold", "Jumlah Edge", "Jumlah Klaster"],
+                title="Edge Density vs Modularity",
+                labels={
+                    "Metode": "Method",
+                    "Desa": "Village",
+                    "Jumlah Edge": "Number of Edges",
+                    "Jumlah Klaster": "Number of Clusters",
+                },
+            )
+            fig_density.update_layout(legend_title_text="Method")
+            st.plotly_chart(fig_density, use_container_width=True, config=PLOTLY_DRAW_CONFIG)
+            too_sparse = density_df[density_df["Density"] < 0.01]
+            too_dense = density_df[density_df["Density"] > 0.50]
+            st.info(f"Very sparse network indications: {len(too_sparse)} evaluation(s). Very dense network indications: {len(too_dense)} evaluation(s).")
+
+    with st.expander("6. Similarity Distribution by Method", expanded=False):
+        run_similarity_distribution = st.checkbox(
+            "Compute pairwise similarity distributions",
+            value=False,
+            help="This reads all pairwise similarities before thresholding and may be slow for large villages.",
+        )
+        if not run_similarity_distribution:
+            st.info("Enable this option to compute pairwise similarity histograms and violin plots.")
+        else:
+            with st.spinner("Computing pairwise similarity distributions..."):
+                sim_df, sim_summary = collect_similarity_distribution(
+                    df_kk,
+                    desa_col,
+                    basis_col,
+                    EDGE_REKAP_COLS,
+                    methods,
+                    threshold_grid,
+                    onehot_round_decimals,
+                )
+            if sim_df.empty:
+                st.warning("Similarity distributions are not available.")
+                sim_summary = pd.DataFrame()
+            else:
+                selected_sim_desa = st.selectbox("Village filter for similarity distributions", ["All villages"] + sorted(sim_df["Desa"].astype(str).unique().tolist()), index=0)
+                sim_plot = sim_df if selected_sim_desa == "All villages" else sim_df[sim_df["Desa"].astype(str) == selected_sim_desa]
+                fig_hist = px.histogram(
+                    sim_plot,
+                    x="Similarity",
+                    color="Metode",
+                    nbins=40,
+                    barmode="overlay",
+                    opacity=0.62,
+                    title="Similarity Histogram by Method",
+                    labels={"Metode": "Method"},
+                )
+                fig_hist.update_layout(legend_title_text="Method")
+                for _, row in sim_summary.groupby("Metode", as_index=False)["Threshold Selected"].mean().iterrows():
+                    fig_hist.add_vline(x=float(row["Threshold Selected"]), line_dash="dash", annotation_text=str(row["Metode"]))
+                st.plotly_chart(fig_hist, use_container_width=True, config=PLOTLY_DRAW_CONFIG)
+                fig_box = px.violin(
+                    sim_plot,
+                    x="Metode",
+                    y="Similarity",
+                    color="Metode",
+                    box=True,
+                    points=False,
+                    title="Similarity Distribution by Method",
+                    labels={"Metode": "Method"},
+                )
+                fig_box.update_layout(xaxis_title="Method", legend_title_text="Method")
+                st.plotly_chart(fig_box, use_container_width=True, config=PLOTLY_DRAW_CONFIG)
+            if not sim_summary.empty:
+                st.dataframe(sim_summary, use_container_width=True, hide_index=True)
+
+    with st.expander("7. Village Sensitivity Classification", expanded=True):
+        village_class_df = classify_village_sensitivity(result_df)
+        if village_class_df.empty:
+            st.warning("Village sensitivity classification is not available.")
+        else:
+            c1, c2 = st.columns(2)
+            with c1:
+                fig_cls = px.bar(village_class_df["Sensitivity Category"].value_counts().reset_index(name="Number of Villages").rename(columns={"index": "Sensitivity Category"}), x="Sensitivity Category", y="Number of Villages", title="Number of Villages by Sensitivity Category")
+                st.plotly_chart(fig_cls, use_container_width=True, config=PLOTLY_DRAW_CONFIG)
+            with c2:
+                fig_dom = px.bar(village_class_df["Dominance Category"].value_counts().reset_index(name="Number of Villages").rename(columns={"index": "Dominance Category"}), x="Dominance Category", y="Number of Villages", title="Number of Villages by Method Dominance")
+                st.plotly_chart(fig_dom, use_container_width=True, config=PLOTLY_DRAW_CONFIG)
+            st.dataframe(village_class_df, use_container_width=True, hide_index=True)
+
+    with st.expander("8. Network Small Multiples", expanded=False):
+        run_small_multiples = st.checkbox(
+            "Render network small multiples",
+            value=False,
+            help="This rebuilds three networks for the selected village.",
+        )
+        desa_values = sorted(df_kk[desa_col].dropna().astype(str).str.strip().unique().tolist())
+        if not run_small_multiples:
+            st.info("Enable this option to render side-by-side Cosine, Jaccard, and Pearson networks for one village.")
+        elif not desa_values:
+            st.warning("The village list is not available.")
+        else:
+            selected_network_desa = st.selectbox("Select village for network small multiples", desa_values, index=0)
+            selected_threshold = st.select_slider("Threshold Small Multiples", options=[float(t) for t in threshold_grid], value=float(threshold_grid[min(3, len(threshold_grid)-1)]))
+            df_v = df_kk[df_kk[desa_col].astype(str).str.strip() == selected_network_desa].copy()
+            if "f_ikr_dari_rekap_kk" in df_v.columns:
+                df_v = add_bps_ikr_category(df_v, ikr_col="f_ikr_dari_rekap_kk")
+            cols = st.columns(3)
+            for idx, (method_label, method_key) in enumerate(methods):
+                with cols[idx]:
+                    res = build_sna_network(
+                        df_v,
+                        basis_col,
+                        selected_threshold,
+                        lcc_only=True,
+                        similarity_method=method_key,
+                        force_louvain_lcc=True,
+                        threshold_grid=threshold_grid,
+                        edge_feature_cols=EDGE_REKAP_COLS,
+                        onehot_round_decimals=onehot_round_decimals,
+                        threshold_mode="Fixed Threshold",
+                    )
+                    st.markdown(f"#### {method_label}")
+                    if not res:
+                        st.warning("The network could not be formed.")
+                        continue
+                    G, partition, _, meta = res
+                    modularity = _safe_float_metric(community_louvain.modularity(partition, G, weight="weight"), default=0.0)
+                    m1, m2, m3 = st.columns(3)
+                    m1.metric("Node", int(G.number_of_nodes()))
+                    m2.metric("Edge", int(G.number_of_edges()))
+                    m3.metric("Q", f"{modularity:.3f}")
+                    m4, m5, m6 = st.columns(3)
+                    m4.metric("Density", f"{float(nx.density(G)):.3f}" if G.number_of_nodes() > 1 else "0.000")
+                    m5.metric("Cluster", int(len(set(partition.values()))))
+                    m6.metric("Thr", f"{float(meta.get('threshold_selected', selected_threshold)):.2f}")
+                    fig_net = render_network_small_multiple_figure(G, partition, method_label)
+                    if fig_net is not None:
+                        st.plotly_chart(fig_net, use_container_width=True, config=PLOTLY_DRAW_CONFIG)
+
+    st.markdown("### Auto-generated Q1 Narrative")
+    st.markdown(f"<div class='soft-card'>{q1_narrative}</div>", unsafe_allow_html=True)
 
 
 def dataframe_to_png_bytes(df, title, subtitle=None):
@@ -3542,6 +4341,9 @@ def build_journal_score_summary(result_df):
         np.isclose(valid_df["Modularity"], max_modularity_per_desa, atol=1e-9)
     ).astype(int)
 
+    success_df = df.groupby("Metode", as_index=False).agg(Success_Rate=("Valid Graph", "mean"))
+    rank_df, rank_summary = build_rank_stability_table(valid_df)
+    avg_rank_df = rank_summary[["Metode", "Average Rank"]] if not rank_summary.empty else pd.DataFrame(columns=["Metode", "Average Rank"])
     agg_df = (
         valid_df.groupby("Metode", as_index=False)
         .agg(
@@ -3549,10 +4351,12 @@ def build_journal_score_summary(result_df):
             Mean_Node_Coverage=("Node Coverage", "mean"),
             Mean_Clusters=("Jumlah Klaster", "mean"),
             Mean_Density=("Density", "mean"),
-            Success_Rate=("Valid Graph", "mean"),
             Village_Win_Rate=("Village Win", "mean"),
         )
+        .merge(success_df, on="Metode", how="left")
+        .merge(avg_rank_df, on="Metode", how="left")
     )
+    agg_df["Average Rank"] = agg_df["Average Rank"].fillna(len(agg_df) + 1)
 
     agg_df["Score_Modularity"] = min_max_scale(agg_df["Mean_Modularity"])
     agg_df["Score_Coverage"] = min_max_scale(agg_df["Mean_Node_Coverage"])
@@ -3954,32 +4758,45 @@ k1.metric("Jumlah Desa", int(result_df["Desa"].nunique()))
 k2.metric("Jumlah KK", int(df_kk["family_id"].nunique()) if "family_id" in df_kk.columns else 0)
 k3.metric("Jumlah Evaluasi", int(len(result_df)))
 
-render_journal_comparison_section(result_df)
+baseline_tab, q1_tab = st.tabs(["Baseline Method Comparison", "Q1 Robustness & Method Validation"])
 
-display_df = result_df.copy()
-display_df["Density"] = display_df["Density"].map(lambda x: f"{float(x):.4f}")
-display_df["Modularity"] = display_df["Modularity"].map(lambda x: f"{float(x):.4f}")
-display_df["Threshold"] = display_df["Threshold"].map(lambda x: "-" if pd.isna(x) else f"{float(x):.2f}")
+with baseline_tab:
+    render_journal_comparison_section(result_df)
 
-st.markdown("### Tabel Hasil Semua Desa")
-st.dataframe(display_df, use_container_width=True, hide_index=True)
+    display_df = result_df.copy()
+    display_df["Density"] = display_df["Density"].map(lambda x: f"{float(x):.4f}")
+    display_df["Modularity"] = display_df["Modularity"].map(lambda x: f"{float(x):.4f}")
+    display_df["Threshold"] = display_df["Threshold"].map(lambda x: "-" if pd.isna(x) else f"{float(x):.2f}")
 
-pivot_df = result_df.copy()
-pivot_df["Ringkasan"] = pivot_df.apply(
-    lambda row: (
-        f"Node {int(row['Jumlah Node'])} | "
-        f"Edge {int(row['Jumlah Edge'])} | "
-        f"Density {float(row['Density']):.4f} | "
-        f"Klaster {int(row['Jumlah Klaster'])} | "
-        f"Modularity {float(row['Modularity']):.4f}"
-    ),
-    axis=1,
-)
-pivot_df = pivot_df.pivot(index="Desa", columns="Metode", values="Ringkasan").reset_index()
+    st.markdown("### Tabel Hasil Semua Desa")
+    st.dataframe(display_df, use_container_width=True, hide_index=True)
 
-st.markdown("### Ringkasan Per Desa")
-st.dataframe(pivot_df, use_container_width=True, hide_index=True)
+    pivot_df = result_df.copy()
+    pivot_df["Ringkasan"] = pivot_df.apply(
+        lambda row: (
+            f"Node {int(row['Jumlah Node'])} | "
+            f"Edge {int(row['Jumlah Edge'])} | "
+            f"Density {float(row['Density']):.4f} | "
+            f"Klaster {int(row['Jumlah Klaster'])} | "
+            f"Modularity {float(row['Modularity']):.4f}"
+        ),
+        axis=1,
+    )
+    pivot_df = pivot_df.pivot(index="Desa", columns="Metode", values="Ringkasan").reset_index()
 
-with st.expander("Data Kepala Keluarga yang Dipakai", expanded=False):
-    preview_cols = [col for col in ["family_id", col_desa, *EDGE_REKAP_COLS] if col in df_kk.columns]
-    st.dataframe(df_kk[preview_cols], use_container_width=True, hide_index=True)
+    st.markdown("### Ringkasan Per Desa")
+    st.dataframe(pivot_df, use_container_width=True, hide_index=True)
+
+    with st.expander("Data Kepala Keluarga yang Dipakai", expanded=False):
+        preview_cols = [col for col in ["family_id", col_desa, *EDGE_REKAP_COLS] if col in df_kk.columns]
+        st.dataframe(df_kk[preview_cols], use_container_width=True, hide_index=True)
+
+with q1_tab:
+    render_q1_robustness_validation(
+        df_kk=df_kk,
+        result_df=result_df,
+        desa_col=col_desa,
+        basis_col=basis_col,
+        onehot_round_decimals=onehot_round_decimals,
+        threshold_grid=threshold_grid,
+    )
