@@ -3213,8 +3213,23 @@ def build_journal_household_boxplot_figure(
         x="Village",
         y="iid_rumah_tangga",
         category_orders={"Village": median_order},
-        points=False,
+        points="outliers",
         color_discrete_sequence=["#2563eb"],
+    )
+    fig.update_traces(
+        boxmean=False,
+        boxpoints="outliers",
+        fillcolor="rgba(37, 99, 235, 0.18)",
+        jitter=0.18,
+        line=dict(color="#163249", width=1.8),
+        marker=dict(
+            color="rgba(37, 99, 235, 0.48)",
+            line=dict(color="#163249", width=0.4),
+            outliercolor="#dc2626",
+            size=3.5,
+        ),
+        pointpos=0,
+        whiskerwidth=0.85,
     )
     fig.update_layout(
         title="Household Digital Inclusion Scores by Village",
